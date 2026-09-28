@@ -4,11 +4,14 @@
 import json
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 from urllib import request
 from urllib.error import URLError
+
+# Add repo root to sys.path so 'src' can be imported
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.rag.config import load_config
 from src.rag.evaluation import evaluate_single_question
@@ -66,14 +69,15 @@ def run_evaluation(config: Dict[str, Any]) -> Dict[str, Any]:
     """Run full evaluation against the RAG system.
 
     Args:
-        config: Configuration dictionary (must include api_url)
+        config: Configuration dictionary (must include api_gateway_url or api_url)
 
     Returns:
         Evaluation results
     """
-    api_url = config.get("api_url")
+    # Support both api_gateway_url (docs) and api_url (legacy) keys
+    api_url = config.get("api_gateway_url") or config.get("api_url")
     if not api_url:
-        raise ValueError("api_url must be set in config for evaluation")
+        raise ValueError("api_gateway_url must be set in config for evaluation")
 
     dataset_path = config.get("eval_dataset_path", "eval/dataset.jsonl")
     questions = load_eval_dataset(dataset_path)
@@ -98,10 +102,18 @@ def run_evaluation(config: Dict[str, Any]) -> Dict[str, Any]:
         "citation_accuracy": sum(r["scores"]["citation_accuracy"] for r in results) / len(results),
     }
 
+    # Calculate total token usage from all questions
+    total_input_tokens = sum(r["token_usage"].get("input_tokens", 0) for r in results)
+    total_output_tokens = sum(r["token_usage"].get("output_tokens", 0) for r in results)
+
     return {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "total_questions": len(results),
         "average_scores": avg_scores,
+        "total_token_usage": {
+            "input_tokens": total_input_tokens,
+            "output_tokens": total_output_tokens,
+        },
         "detailed_results": results,
     }
 
@@ -118,17 +130,27 @@ def check_thresholds(results: Dict[str, Any], thresholds: Dict[str, float]) -> b
     """
     avg_scores = results["average_scores"]
 
+    # Add per-metric pass/fail to results
+    metric_results = {}
     passed = True
+
     print("\n" + "=" * 60)
     print("EVALUATION QUALITY GATE")
     print("=" * 60)
 
     for metric, score in avg_scores.items():
         threshold = thresholds.get(metric, 0.0)
-        status = "✓ PASS" if score >= threshold else "✗ FAIL"
+        metric_passed = score >= threshold
+        status = "✓ PASS" if metric_passed else "✗ FAIL"
         print(f"{metric:20s}: {score:.3f} (threshold: {threshold:.3f}) {status}")
 
-        if score < threshold:
+        metric_results[metric] = {
+            "score": score,
+            "threshold": threshold,
+            "passed": metric_passed,
+        }
+
+        if not metric_passed:
             passed = False
 
     print("=" * 60)
@@ -139,6 +161,10 @@ def check_thresholds(results: Dict[str, Any], thresholds: Dict[str, float]) -> b
         print("✗ Some metrics below threshold. Quality gate: FAIL")
 
     print("=" * 60)
+
+    # Add gate result to results dict
+    results["gate_passed"] = passed
+    results["metric_results"] = metric_results
 
     return passed
 
@@ -152,7 +178,7 @@ def save_report(results: Dict[str, Any], output_dir: str = "eval/reports") -> No
     """
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
     json_path = f"{output_dir}/eval_report_{timestamp}.json"
     with open(json_path, "w") as f:

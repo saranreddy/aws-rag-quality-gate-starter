@@ -61,19 +61,19 @@ variable "enable_vpc_endpoints" {
 variable "chunk_size" {
   description = "Text chunk size in characters"
   type        = number
-  default     = 512
+  default     = 800
 }
 
 variable "chunk_overlap" {
   description = "Text chunk overlap in characters"
   type        = number
-  default     = 50
+  default     = 100
 }
 
 variable "top_k" {
   description = "Number of chunks to retrieve for RAG"
   type        = number
-  default     = 5
+  default     = 7
 }
 
 variable "vpc_cidr" {

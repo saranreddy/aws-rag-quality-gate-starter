@@ -8,7 +8,6 @@ from urllib.parse import unquote_plus
 import boto3
 import psycopg2
 from pgvector.psycopg2 import register_vector
-from pypdf import PdfReader
 
 
 def extract_text_from_pdf(pdf_path: str) -> List[Tuple[str, int]]:
@@ -20,6 +19,8 @@ def extract_text_from_pdf(pdf_path: str) -> List[Tuple[str, int]]:
     Returns:
         List of (text, page_number) tuples
     """
+    from pypdf import PdfReader
+
     reader = PdfReader(pdf_path)
     pages = []
     for i, page in enumerate(reader.pages):

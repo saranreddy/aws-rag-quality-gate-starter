@@ -24,9 +24,9 @@ aurora_engine_version = "15.15"
 force_destroy_buckets = true
 
 # RAG Configuration
-chunk_size    = 512
-chunk_overlap = 50
-top_k         = 5
+chunk_size    = 800
+chunk_overlap = 100
+top_k         = 7
 
 # VPC Configuration
 vpc_cidr = "10.0.0.0/16"

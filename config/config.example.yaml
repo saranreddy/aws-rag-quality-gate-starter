@@ -21,12 +21,12 @@ api_gateway_url: https://xxxxx.execute-api.us-east-1.amazonaws.com
 
 # Bedrock Configuration
 embedding_model_id: amazon.titan-embed-text-v2:0
-llm_model_id: anthropic.claude-sonnet-5
+llm_model_id: us.anthropic.claude-sonnet-4-6
 
 # Retrieval Configuration
-top_k: 5
-chunk_size: 512
-chunk_overlap: 50
+top_k: 7
+chunk_size: 800
+chunk_overlap: 100
 
 # Evaluation Configuration
 eval_dataset_path: eval/dataset.jsonl

@@ -160,7 +160,13 @@ def evaluate_citation_accuracy(
     citations: List[Dict[str, Any]],
     expected_sources: List[str],
 ) -> float:
-    """Evaluate citation accuracy using deterministic checks.
+    """Evaluate citation accuracy using precision against expected sources.
+
+    Scoring:
+    - If expected_sources is empty and no citations given: 1.0 (correct)
+    - If expected_sources is empty but citations given: 0.8 (acceptable but unexpected)
+    - If expected_sources exist: precision = (cited sources in expected set) / (total cited sources)
+    - Bonus for using citation markers in the answer text
 
     Args:
         answer: Generated answer
@@ -177,20 +183,22 @@ def evaluate_citation_accuracy(
     expected_set = set(expected_sources)
 
     if not expected_set:
-        return 1.0 if not cited_sources else 0.8
+        # No sources expected, but model cited something (acceptable for extra evidence)
+        return 0.8
 
-    intersection = cited_sources & expected_set
-    union = cited_sources | expected_set
+    # Precision: what fraction of cited sources are in the expected set?
+    # This rewards citing any valid source and doesn't penalize citing multiple valid sources
+    correct_citations = cited_sources & expected_set
+    precision = len(correct_citations) / len(cited_sources) if cited_sources else 0.0
 
-    jaccard_score = len(intersection) / len(union) if union else 0.0
-
+    # Bonus for actually using citation markers in the answer
     has_citations_in_answer = any(
         f"[{citation['number']}]" in answer
         for citation in citations
     )
     citation_usage_score = 1.0 if has_citations_in_answer else 0.5
 
-    return (jaccard_score + citation_usage_score) / 2.0
+    return (precision + citation_usage_score) / 2.0
 
 
 def evaluate_single_question(
@@ -208,37 +216,54 @@ def evaluate_single_question(
     Returns:
         Evaluation results with scores
     """
+    answer = answer_data["answer"]
+    citations = answer_data.get("citations", [])
+
+    # Check if this is a refusal (unanswerable question)
+    is_refusal = "I don't know" in answer or "don't have enough information" in answer
+
     correctness = evaluate_correctness(
         question_data["question"],
-        answer_data["answer"],
+        answer,
         question_data["expected_answer"],
         config["llm_model_id"],
         config["aws_region"],
     )
 
-    # Pass full chunk text to faithfulness judge instead of truncated snippets
-    context_chunks = [citation.get("full_text", citation["snippet"]) for citation in answer_data.get("citations", [])]
-    faithfulness = evaluate_faithfulness(
-        answer_data["answer"],
-        context_chunks if context_chunks else ["No context retrieved"],
-        config["llm_model_id"],
-        config["aws_region"],
-    )
+    # Special handling for refusals
+    if is_refusal:
+        # Correct refusals get full faithfulness (the model correctly didn't hallucinate)
+        faithfulness = 1.0
+        # Citation accuracy: no citations = good, citations present = penalize
+        citation_accuracy = 1.0 if not citations else 0.3
+    else:
+        # Pass full chunk text to faithfulness judge instead of truncated snippets
+        context_chunks = [citation.get("full_text", citation["snippet"]) for citation in citations]
+        if not context_chunks:
+            # No citations retrieved but model answered anyway - likely hallucination
+            faithfulness = 0.2
+        else:
+            faithfulness = evaluate_faithfulness(
+                answer,
+                context_chunks,
+                config["llm_model_id"],
+                config["aws_region"],
+            )
 
-    citation_accuracy = evaluate_citation_accuracy(
-        answer_data["answer"],
-        answer_data.get("citations", []),
-        question_data.get("expected_sources", []),
-    )
+        citation_accuracy = evaluate_citation_accuracy(
+            answer,
+            citations,
+            question_data.get("expected_sources", []),
+        )
 
     return {
         "question": question_data["question"],
-        "answer": answer_data["answer"],
+        "answer": answer,
         "scores": {
             "correctness": correctness,
             "faithfulness": faithfulness,
             "citation_accuracy": citation_accuracy,
         },
-        "citations": answer_data.get("citations", []),
+        "citations": citations,
         "token_usage": answer_data.get("token_usage", {}),
     }

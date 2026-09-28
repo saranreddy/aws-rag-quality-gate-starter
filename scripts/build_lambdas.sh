@@ -22,29 +22,29 @@ pip install \
   --python-version 3.11 \
   --only-binary=:all: \
   --target "$BUILD_DIR/db_init" \
-  psycopg2-binary pgvector boto3
+  psycopg2-binary pgvector
 
 # Build ingest Lambda
 echo "Building ingest Lambda..."
 mkdir -p "$BUILD_DIR/ingest"
-cp -r "$SRC_DIR/rag"/* "$BUILD_DIR/ingest/"
+cp -r "$SRC_DIR/rag" "$SRC_DIR/lambda_handlers" "$BUILD_DIR/ingest/"
 pip install \
   --platform manylinux2014_x86_64 \
   --python-version 3.11 \
   --only-binary=:all: \
   --target "$BUILD_DIR/ingest" \
-  psycopg2-binary pgvector boto3 pypdf reportlab PyYAML
+  psycopg2-binary pgvector pypdf reportlab PyYAML
 
 # Build query Lambda
 echo "Building query Lambda..."
 mkdir -p "$BUILD_DIR/query"
-cp -r "$SRC_DIR/rag"/* "$BUILD_DIR/query/"
+cp -r "$SRC_DIR/rag" "$SRC_DIR/lambda_handlers" "$BUILD_DIR/query/"
 pip install \
   --platform manylinux2014_x86_64 \
   --python-version 3.11 \
   --only-binary=:all: \
   --target "$BUILD_DIR/query" \
-  psycopg2-binary pgvector boto3 PyYAML
+  psycopg2-binary pgvector PyYAML
 
 echo "Lambda build complete!"
 echo "Deployment packages in: $BUILD_DIR"

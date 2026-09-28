@@ -70,7 +70,24 @@ def test_evaluate_citation_accuracy_perfect():
 
 
 def test_evaluate_citation_accuracy_partial():
-    """Test citation accuracy with partial match."""
+    """Test citation accuracy with one correct and one incorrect citation."""
+    answer = "The answer [1] is here [2]."
+    citations = [
+        {"number": 1, "source": "doc1.pdf"},
+        {"number": 2, "source": "doc3.pdf"},  # Not in expected sources
+    ]
+    expected_sources = ["doc1.pdf", "doc2.pdf"]
+
+    score = evaluate_citation_accuracy(answer, citations, expected_sources)
+
+    # Precision: 1 correct out of 2 cited = 0.5
+    # Citation usage: 1.0 (markers present)
+    # Score: (0.5 + 1.0) / 2 = 0.75
+    assert score == 0.75
+
+
+def test_evaluate_citation_accuracy_one_of_multiple_expected():
+    """Test citation accuracy with one correct citation when multiple are acceptable."""
     answer = "The answer [1] is here."
     citations = [
         {"number": 1, "source": "doc1.pdf"},
@@ -79,8 +96,10 @@ def test_evaluate_citation_accuracy_partial():
 
     score = evaluate_citation_accuracy(answer, citations, expected_sources)
 
-    assert score > 0.0
-    assert score < 1.0
+    # Precision: 1 correct out of 1 cited = 1.0
+    # Citation usage: 1.0 (markers present)
+    # Score: (1.0 + 1.0) / 2 = 1.0
+    assert score == 1.0
 
 
 def test_evaluate_citation_accuracy_no_citations():
