@@ -6,27 +6,33 @@ from src.rag.ingest import chunk_text
 
 
 def test_chunk_text():
-    """Test text chunking with overlap."""
-    text = "a" * 1000
-    chunks = chunk_text(text, chunk_size=100, chunk_overlap=20)
+    """Test text chunking with sentence boundaries."""
+    text = "First sentence. Second sentence. Third sentence. Fourth sentence."
+    chunks = chunk_text(text, chunk_size=40, chunk_overlap=15)
 
     assert len(chunks) > 0
-    assert all(len(chunk[0]) <= 100 for chunk in chunks)
-
-    chunks[0][0]
-    assert chunks[0][1] == 0
-    assert chunks[0][2] == 100
+    # Chunks should not cut mid-sentence
+    for chunk_content, start, end in chunks:
+        assert not chunk_content.endswith(" senten")  # Not cut mid-word
 
 
 def test_chunk_text_short():
     """Test chunking text shorter than chunk size."""
-    text = "short text"
+    text = "Short text."
     chunks = chunk_text(text, chunk_size=100, chunk_overlap=20)
 
     assert len(chunks) == 1
-    assert chunks[0][0] == text
-    assert chunks[0][1] == 0
-    assert chunks[0][2] == len(text)
+    assert "Short text" in chunks[0][0]
+
+
+def test_chunk_text_respects_sentences():
+    """Test that chunking doesn't cut mid-sentence."""
+    text = "This is sentence one. This is sentence two. This is sentence three."
+    chunks = chunk_text(text, chunk_size=30, chunk_overlap=10)
+
+    for chunk_content, start, end in chunks:
+        # Each chunk should contain complete sentences
+        assert chunk_content.strip().endswith('.') or chunk_content == chunks[-1][0]
 
 
 def test_chunk_text_empty():

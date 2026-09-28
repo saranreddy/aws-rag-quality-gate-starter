@@ -176,3 +176,74 @@ def test_parse_judge_response_missing_score():
 
     assert success is False
     assert score == 0.0
+
+
+def test_evaluate_single_question_refusal_on_unanswerable():
+    """Test that correct refusal on unanswerable question gets high scores."""
+
+    question_data = {
+        "question": "What is the meaning of life?",
+        "expected_answer": "I don't know based on the provided documents.",
+        "expected_sources": []  # Unanswerable
+    }
+
+    answer_data = {
+        "answer": "I don't know based on the provided documents.",
+        "citations": [],
+        "token_usage": {"input_tokens": 10, "output_tokens": 5}
+    }
+
+    config = {
+        "llm_model_id": "test-model",
+        "aws_region": "us-east-1"
+    }
+
+    # Mock the LLM judge calls
+    import src.rag.evaluation as eval_module
+    original_correctness = eval_module.evaluate_correctness
+    eval_module.evaluate_correctness = lambda *args, **kwargs: 1.0
+
+    try:
+        result = eval_module.evaluate_single_question(question_data, answer_data, config)
+
+        # Correct refusal should get full faithfulness and citation scores
+        assert result["scores"]["faithfulness"] == 1.0
+        assert result["scores"]["citation_accuracy"] == 1.0
+    finally:
+        eval_module.evaluate_correctness = original_correctness
+
+
+def test_evaluate_single_question_refusal_on_answerable():
+    """Test that refusal on answerable question is scored as wrong."""
+
+    question_data = {
+        "question": "What is SOC 2?",
+        "expected_answer": "SOC 2 is a compliance framework.",
+        "expected_sources": ["doc1.pdf"]  # Answerable
+    }
+
+    answer_data = {
+        "answer": "I don't know based on the provided documents.",
+        "citations": [],
+        "token_usage": {"input_tokens": 10, "output_tokens": 5}
+    }
+
+    config = {
+        "llm_model_id": "test-model",
+        "aws_region": "us-east-1"
+    }
+
+    # Mock the LLM judge calls
+    import src.rag.evaluation as eval_module
+    original_correctness = eval_module.evaluate_correctness
+    eval_module.evaluate_correctness = lambda *args, **kwargs: 0.0  # Wrong answer
+
+    try:
+        result = eval_module.evaluate_single_question(question_data, answer_data, config)
+
+        # Refusal on answerable question should not get special treatment
+        # Faithfulness should be low (no context retrieved)
+        assert result["scores"]["faithfulness"] == 0.2
+        assert result["scores"]["citation_accuracy"] == 0.0
+    finally:
+        eval_module.evaluate_correctness = original_correctness

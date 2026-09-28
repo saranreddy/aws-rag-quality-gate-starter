@@ -105,7 +105,8 @@ Context passages (numbered for citation):
 Instructions:
 - Answer the question using ONLY information from the context
 - Cite sources using [1], [2], etc. after each claim
-- If the context doesn't contain enough information, respond: "I don't know based on the provided documents."
+- If the context doesn't contain enough information, respond with EXACTLY this sentence and nothing else: "I don't know based on the provided documents."
+- Do NOT add citation numbers to a refusal
 - Be precise and include relevant details with citations
 
 Question: {question}
@@ -132,19 +133,23 @@ Answer:"""
 
     result = json.loads(response["body"].read())
 
-    answer_text = result["content"][0]["text"]
+    answer_text = result["content"][0]["text"].strip()
 
-    citations = []
-    for i, chunk in enumerate(context_chunks):
-        citation_marker = f"[{i+1}]"
-        if citation_marker in answer_text:
-            citations.append({
-                "number": i + 1,
-                "source": chunk["document_id"],
-                "page": chunk["page_number"],
-                "snippet": chunk["chunk_text"][:200] + "..." if len(chunk["chunk_text"]) > 200 else chunk["chunk_text"],
-                "full_text": chunk["chunk_text"],
-            })
+    # If the answer is a refusal, return no citations
+    if answer_text == "I don't know based on the provided documents.":
+        citations = []
+    else:
+        citations = []
+        for i, chunk in enumerate(context_chunks):
+            citation_marker = f"[{i+1}]"
+            if citation_marker in answer_text:
+                citations.append({
+                    "number": i + 1,
+                    "source": chunk["document_id"],
+                    "page": chunk["page_number"],
+                    "snippet": chunk["chunk_text"][:200] + "..." if len(chunk["chunk_text"]) > 200 else chunk["chunk_text"],
+                    "full_text": chunk["chunk_text"],
+                })
 
     return {
         "answer": answer_text,

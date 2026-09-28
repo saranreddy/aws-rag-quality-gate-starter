@@ -234,7 +234,6 @@ def main() -> int:
 
     try:
         results = run_evaluation(config)
-        save_report(results)
 
         thresholds = config.get("eval_thresholds", {
             "correctness": 0.7,
@@ -243,6 +242,9 @@ def main() -> int:
         })
 
         passed = check_thresholds(results, thresholds)
+
+        # Save report after check_thresholds so gate_passed/metric_results are included
+        save_report(results)
 
         return 0 if passed else 1
 

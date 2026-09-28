@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from typing import Any, Dict, List, Tuple
 from urllib.parse import unquote_plus
 
@@ -44,11 +45,11 @@ def extract_text_from_text_file(file_path: str) -> List[Tuple[str, int]]:
 
 
 def chunk_text(text: str, chunk_size: int = 512, chunk_overlap: int = 50) -> List[Tuple[str, int, int]]:
-    """Split text into overlapping chunks.
+    """Split text into overlapping chunks on sentence boundaries.
 
     Args:
         text: Input text
-        chunk_size: Maximum chunk size in characters
+        chunk_size: Target chunk size in characters (may exceed slightly to avoid mid-sentence cuts)
         chunk_overlap: Overlap between chunks in characters
 
     Returns:
@@ -57,15 +58,52 @@ def chunk_text(text: str, chunk_size: int = 512, chunk_overlap: int = 50) -> Lis
     if not text:
         return []
 
-    chunks = []
-    start = 0
-    text_len = len(text)
+    # Split on sentence boundaries: period, question mark, exclamation, or newlines
+    # Also split on markdown headings (lines starting with #)
+    sentence_endings = re.compile(r'(?<=[.!?])\s+|\n+|(?=^#{1,6}\s)', re.MULTILINE)
+    sentences = sentence_endings.split(text)
 
-    while start < text_len:
-        end = min(start + chunk_size, text_len)
-        chunk = text[start:end]
-        chunks.append((chunk, start, end))
-        start += chunk_size - chunk_overlap
+    chunks = []
+    current_chunk = []
+    current_length = 0
+    chunk_start = 0
+
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+
+        sentence_len = len(sentence)
+
+        # If adding this sentence would exceed chunk_size and we have content, finalize chunk
+        if current_length + sentence_len > chunk_size and current_chunk:
+            chunk_content = ' '.join(current_chunk)
+            chunk_end = chunk_start + len(chunk_content)
+            chunks.append((chunk_content, chunk_start, chunk_end))
+
+            # Start new chunk with overlap
+            # Keep sentences from the end that fit within overlap size
+            overlap_length = 0
+            overlap_sentences = []
+            for sent in reversed(current_chunk):
+                if overlap_length + len(sent) <= chunk_overlap:
+                    overlap_sentences.insert(0, sent)
+                    overlap_length += len(sent) + 1  # +1 for space
+                else:
+                    break
+
+            current_chunk = overlap_sentences
+            current_length = overlap_length
+            chunk_start = chunk_end - overlap_length
+
+        current_chunk.append(sentence)
+        current_length += sentence_len + 1  # +1 for space
+
+    # Add final chunk if any content remains
+    if current_chunk:
+        chunk_content = ' '.join(current_chunk)
+        chunk_end = chunk_start + len(chunk_content)
+        chunks.append((chunk_content, chunk_start, chunk_end))
 
     return chunks
 

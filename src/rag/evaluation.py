@@ -218,9 +218,10 @@ def evaluate_single_question(
     """
     answer = answer_data["answer"]
     citations = answer_data.get("citations", [])
+    expected_sources = question_data.get("expected_sources", [])
 
-    # Check if this is a refusal (unanswerable question)
-    is_refusal = "I don't know" in answer or "don't have enough information" in answer
+    # Stricter refusal detection: exact match of the standard refusal sentence
+    is_refusal = answer.strip() == "I don't know based on the provided documents."
 
     correctness = evaluate_correctness(
         question_data["question"],
@@ -230,13 +231,14 @@ def evaluate_single_question(
         config["aws_region"],
     )
 
-    # Special handling for refusals
-    if is_refusal:
-        # Correct refusals get full faithfulness (the model correctly didn't hallucinate)
+    # Special handling for refusals on truly unanswerable questions
+    if is_refusal and not expected_sources:
+        # Correct refusal on unanswerable question
         faithfulness = 1.0
-        # Citation accuracy: no citations = good, citations present = penalize
-        citation_accuracy = 1.0 if not citations else 0.3
+        # Citation accuracy: no citations = perfect, citations present = mild penalty
+        citation_accuracy = 1.0 if not citations else 0.7
     else:
+        # Either not a refusal, or refusal on an answerable question (wrong answer)
         # Pass full chunk text to faithfulness judge instead of truncated snippets
         context_chunks = [citation.get("full_text", citation["snippet"]) for citation in citations]
         if not context_chunks:
@@ -253,7 +255,7 @@ def evaluate_single_question(
         citation_accuracy = evaluate_citation_accuracy(
             answer,
             citations,
-            question_data.get("expected_sources", []),
+            expected_sources,
         )
 
     return {

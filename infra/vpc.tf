@@ -42,6 +42,11 @@ resource "aws_subnet" "private" {
   tags = {
     Name = "${var.project_name}-private-subnet-${count.index + 1}"
   }
+
+  # Lambda ENIs can take time to clean up
+  timeouts {
+    delete = "45m"
+  }
 }
 
 data "aws_availability_zones" "available" {
@@ -123,6 +128,11 @@ resource "aws_security_group" "lambda" {
 
   tags = {
     Name = "${var.project_name}-lambda-sg"
+  }
+
+  # Lambda ENIs can take time to detach during destroy
+  timeouts {
+    delete = "45m"
   }
 }
 

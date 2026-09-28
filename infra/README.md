@@ -197,6 +197,26 @@ terraform destroy
 
 **Warning**: This will delete the Aurora cluster, all S3 buckets (and their contents), and Lambda functions. Back up any important data first.
 
+### Lambda ENI Cleanup Delay
+
+Lambda functions in VPCs create Elastic Network Interfaces (ENIs) that can take 10-15 minutes to detach after function deletion. During `terraform destroy`, you may see:
+
+```
+aws_subnet.private[0]: Still destroying... [12m30s elapsed]
+aws_security_group.lambda: Still destroying... [12m30s elapsed]
+```
+
+This is normal. Terraform will wait up to 45 minutes for ENIs to detach (configured via `timeouts` blocks).
+
+**Optional faster cleanup**: Before running `terraform destroy`, you can manually delete "available" ENIs:
+
+```bash
+# Run from the scripts/ directory
+./cleanup_enis.sh
+```
+
+This helper script identifies and deletes detached ENIs associated with the stack's security group, reducing destroy time to ~2-3 minutes.
+
 ## Modular Database Setup
 
 The Aurora PostgreSQL configuration is designed to be modular. To swap it for a standalone module:
