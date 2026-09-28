@@ -27,6 +27,20 @@ def extract_text_from_pdf(pdf_path: str) -> List[Tuple[str, int]]:
     return pages
 
 
+def extract_text_from_text_file(file_path: str) -> List[Tuple[str, int]]:
+    """Extract text from plain text or markdown file.
+    
+    Args:
+        file_path: Path to text or markdown file
+        
+    Returns:
+        List of (text, page_number) tuples (page 1 for text files)
+    """
+    with open(file_path, 'r', encoding='utf-8') as f:
+        text = f.read()
+    return [(text, 1)]
+
+
 def chunk_text(text: str, chunk_size: int = 512, chunk_overlap: int = 50) -> List[Tuple[str, int, int]]:
     """Split text into overlapping chunks.
     
@@ -155,7 +169,14 @@ def process_document(
     local_path = f"/tmp/{os.path.basename(s3_key)}"
     s3.download_file(s3_bucket, s3_key, local_path)
     
-    pages = extract_text_from_pdf(local_path)
+    # Determine file type and extract text accordingly
+    file_ext = os.path.splitext(s3_key)[1].lower()
+    if file_ext == '.pdf':
+        pages = extract_text_from_pdf(local_path)
+    elif file_ext in ['.txt', '.md']:
+        pages = extract_text_from_text_file(local_path)
+    else:
+        raise ValueError(f"Unsupported file type: {file_ext}. Supported types: .pdf, .txt, .md")
     
     all_chunks = []
     chunk_index = 0

@@ -15,6 +15,7 @@ from diagrams.aws.ml import Bedrock
 from diagrams.aws.network import APIGateway
 from diagrams.aws.security import SecretsManager
 from diagrams.aws.storage import SimpleStorageServiceS3
+from diagrams.onprem.ci import GithubActions
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "architecture")
@@ -34,6 +35,7 @@ with Diagram(
 ):
     user = User("Developer")
     engineer = User("Engineer\n(API client)")
+    ci = GithubActions("GitHub Actions\nEvaluation\nQuality Gate")
 
     with Cluster("AWS Account", graph_attr={"bgcolor": "#f0f0f0"}):
         
@@ -70,6 +72,9 @@ with Diagram(
     query_lambda >> Edge(label="generate answer\nwith citations") >> bedrock
     query_lambda >> Edge(label="JSON response") >> api
     api >> Edge(label="answer +\ncitations") >> engineer
+    
+    ci >> Edge(label="3. Eval queries\n(correctness,\nfaithfulness,\ncitation accuracy)", color="#e66100", style="dashed") >> api
+    api >> Edge(label="block deploy\nif below\nthreshold", color="#e66100", style="dashed") >> ci
     
     ingest_lambda >> Edge(label="logs + metrics", style="dotted") >> cloudwatch
     query_lambda >> Edge(label="logs + metrics", style="dotted") >> cloudwatch

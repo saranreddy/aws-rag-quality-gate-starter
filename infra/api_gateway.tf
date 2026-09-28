@@ -22,7 +22,7 @@ resource "aws_apigatewayv2_integration" "query" {
   integration_type = "AWS_PROXY"
   integration_uri  = aws_lambda_function.query.invoke_arn
 
-  integration_method = "POST"
+  integration_method     = "POST"
   payload_format_version = "2.0"
 }
 

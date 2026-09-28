@@ -1,0 +1,73 @@
+CLOUDSYNC SUPPORT FAQ
+
+ACCOUNT & BILLING
+
+Q: How do I upgrade my plan?
+A: Go to Settings > Billing and click "Upgrade Plan". You can switch between Free, Professional, and Enterprise plans at any time. Upgrades take effect immediately, and you'll be billed prorated for the current month.
+
+Q: What payment methods do you accept?
+A: We accept all major credit cards (Visa, Mastercard, American Express, Discover) and PayPal. Enterprise customers can also pay via wire transfer or purchase order.
+
+Q: Can I cancel my subscription?
+A: Yes, you can cancel anytime from Settings > Billing. When you cancel, you'll retain access to paid features until the end of your current billing period. After that, your account will revert to the Free plan.
+
+Q: Is there a refund policy?
+A: We offer a 30-day money-back guarantee for all paid plans. If you're not satisfied, contact support@cloudsync.com within 30 days of your first payment for a full refund.
+
+STORAGE & FILES
+
+Q: What happens when I reach my storage limit?
+A: On the Free plan with 10 GB storage, you'll receive warnings at 80% and 90% usage. At 100%, you won't be able to upload new files until you delete some files or upgrade. Professional plans have unlimited storage.
+
+Q: How long are deleted files kept?
+A: Deleted files remain in your trash for 90 days. During this time, you can restore them. After 90 days, files are permanently deleted and cannot be recovered.
+
+Q: Can I recover a previous version of a file?
+A: Yes! Right-click any file and select "Version History". Free plans keep 30 days of history, Professional plans keep 180 days. You can view, download, or restore any previous version.
+
+Q: What's the maximum file size?
+A: Individual files up to 50 GB are supported. Larger files may be split or uploaded using our desktop app's advanced uploader.
+
+SHARING & COLLABORATION
+
+Q: How do I share files with people outside my team?
+A: Right-click any file and select "Create Shared Link". You can set an expiration date, require a password, and control whether recipients can download or just view the file. The link works for anyone, even without a CloudSync account.
+
+Q: Can I control who can edit shared folders?
+A: Yes! When sharing a folder, you can assign permissions: View Only, Can Edit, or Admin. Only admins can manage folder membership and permissions.
+
+Q: How many people can collaborate on a document simultaneously?
+A: Up to 50 people can edit a document at the same time. Changes sync in real-time and are shown with colored cursors indicating who's editing.
+
+SECURITY
+
+Q: How secure is CloudSync?
+A: Very secure! All files are encrypted with AES-256 encryption at rest. Data in transit uses TLS 1.3. We're SOC 2 Type II certified and undergo regular security audits. We also offer two-factor authentication for all accounts.
+
+Q: Can CloudSync employees see my files?
+A: No. Our engineers do not have access to view your file contents. Files are encrypted, and only you and people you share with can access them. We may access file metadata (filenames, sizes) for troubleshooting with your permission.
+
+Q: What happens if I lose my password?
+A: You can reset your password via the "Forgot Password" link. We'll send a reset link to your email. Note: If you've enabled encryption at rest with a custom encryption key, you must have your recovery key to access encrypted files after a password reset.
+
+TECHNICAL
+
+Q: Which browsers are supported?
+A: CloudSync works best on the latest versions of Chrome, Firefox, Safari, and Edge. We support browsers released within the last 2 years. For older browsers, use our desktop app.
+
+Q: Why are my files not syncing?
+A: Common causes: 1) Check your internet connection, 2) Ensure the CloudSync desktop app is running, 3) Check if you've hit your storage limit, 4) Verify no firewall is blocking CloudSync. If issues persist, contact support.
+
+Q: Does CloudSync work offline?
+A: Yes! Our desktop and mobile apps support offline mode. Files you've marked as "Available Offline" can be viewed and edited without internet. Changes sync automatically when you're back online.
+
+Q: Can I integrate CloudSync with other tools?
+A: Yes! We have native integrations with Slack, Microsoft Teams, Salesforce, and Zoom. Professional and Enterprise plans also have API access for custom integrations.
+
+SUPPORT
+
+Q: How do I contact support?
+A: Email: support@cloudsync.com (response within 24 hours for Free plan, 4 hours for Professional, 1 hour for Enterprise). Live chat is available for Professional and Enterprise during business hours. Enterprise customers also have 24/7 phone support.
+
+Q: Do you offer training?
+A: Yes! We have free video tutorials and documentation at help.cloudsync.com. Enterprise customers receive personalized onboarding and training sessions with their dedicated account manager.

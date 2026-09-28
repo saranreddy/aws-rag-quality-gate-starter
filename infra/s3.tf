@@ -34,7 +34,7 @@ resource "aws_s3_bucket_public_access_block" "documents" {
   restrict_public_buckets = true
 }
 
-# S3 notification to trigger ingest Lambda
+# S3 notifications to trigger ingest Lambda for multiple file types
 resource "aws_s3_bucket_notification" "documents" {
   bucket = aws_s3_bucket.documents.id
 
@@ -42,6 +42,18 @@ resource "aws_s3_bucket_notification" "documents" {
     lambda_function_arn = aws_lambda_function.ingest.arn
     events              = ["s3:ObjectCreated:*"]
     filter_suffix       = ".pdf"
+  }
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.ingest.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_suffix       = ".txt"
+  }
+
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.ingest.arn
+    events              = ["s3:ObjectCreated:*"]
+    filter_suffix       = ".md"
   }
 
   depends_on = [aws_lambda_permission.s3_invoke_ingest]

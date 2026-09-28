@@ -35,9 +35,15 @@ variable "embedding_model_id" {
 }
 
 variable "llm_model_id" {
-  description = "Bedrock LLM model ID"
+  description = "Bedrock LLM model ID (ensure model access is enabled in Bedrock console)"
   type        = string
   default     = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+}
+
+variable "enable_vpc_endpoints" {
+  description = "Enable VPC endpoints for Bedrock, S3, and Secrets Manager to avoid NAT Gateway costs"
+  type        = bool
+  default     = false
 }
 
 variable "chunk_size" {

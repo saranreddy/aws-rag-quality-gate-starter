@@ -55,11 +55,13 @@ This starter is for teams building production-ready retrieval-augmented generati
 - **AWS CLI** configured (`aws configure`)
 - **Python 3.10+** installed locally
 - **Terraform 1.0+** installed locally
-- **Bedrock Model Access** enabled in AWS Console:
-  - Go to AWS Console → Bedrock → Model access
-  - Request access to:
-    - Amazon Titan Text Embeddings v2
-    - Anthropic Claude 3.5 Sonnet (or your preferred model)
+- **Bedrock Model Access** enabled in AWS Console (⚠️ **Required before deployment**):
+  - Go to AWS Console → Bedrock → Model access → Manage model access
+  - Enable access for:
+    - **Amazon Titan Text Embeddings v2** (`amazon.titan-embed-text-v2:0`)
+    - **Anthropic Claude 3.5 Sonnet** (`anthropic.claude-3-5-sonnet-20241022-v2:0`)
+  - Model access approval is instant for most regions
+  - Some models may require business justification or have regional availability
 
 ## Quick Start
 
@@ -360,20 +362,22 @@ Estimated monthly costs for moderate usage (~5,000 queries/month, 100 documents)
 |----------|----------------------|
 | Aurora Serverless v2 (0.5-2 ACU) | $40-160 (scales with usage) |
 | Lambda invocations | $2-5 |
-| NAT Gateway | $32 + data transfer (~$5-10) |
+| **NAT Gateway** | **$32/month (fixed) + $0.045/GB data transfer** |
 | S3 storage | $1-5 (depends on document volume) |
 | Bedrock (Titan + Claude) | $10-50 (depends on query volume) |
 | API Gateway | $1/million requests (~$0.01) |
 | CloudWatch Logs | $1-2 |
+| VPC Endpoints (optional) | $14/month (eliminates NAT data charges) |
 | **Estimated Total** | **$90-265/month** |
 
 **Cost drivers:**
 - **Aurora** is the largest fixed cost (even at minimum 0.5 ACU)
+- **NAT Gateway** is the second-largest fixed cost ($32/month + data transfer)
 - **Bedrock** costs scale with query volume (embedding + LLM tokens)
-- **NAT Gateway** has fixed monthly charge + data transfer fees
 
 **Cost optimization:**
 - Aurora scales to 0.5 ACU when idle (lower `db_max_capacity` to cap costs)
+- **Eliminate NAT Gateway data charges**: Enable VPC endpoints (set `enable_vpc_endpoints = true` in `infra/terraform.tfvars`). This adds ~$14/month for interface endpoints but eliminates per-GB data transfer charges through NAT ($0.045/GB). Break-even point: ~300 GB/month of Bedrock traffic.
 - Reduce `top_k` to retrieve fewer chunks (lower embedding costs)
 - Use cheaper embedding models (e.g., `amazon.titan-embed-text-v1`)
 - Use cheaper LLMs (e.g., Claude Haiku instead of Sonnet)

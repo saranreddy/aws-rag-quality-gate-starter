@@ -1,0 +1,62 @@
+CloudSync Terms of Service
+
+Effective Date: January 1, 2024
+
+1. ACCEPTANCE OF TERMS
+
+By accessing or using CloudSync ('Service'), you agree to be bound by these Terms of Service ('Terms'). If you do not agree, you may not use the Service.
+
+2. ACCOUNT REGISTRATION
+
+You must provide accurate and complete information when creating an account. You are responsible for maintaining the security of your account credentials. CloudSync is not liable for any loss resulting from unauthorized use of your account.
+
+Accounts are personal and may not be shared. Business accounts require a Professional or Enterprise subscription.
+
+3. ACCEPTABLE USE
+
+You agree NOT to:
+- Upload malware, viruses, or harmful code
+- Share copyrighted content without authorization
+- Use the Service for illegal activities
+- Attempt to breach security or access other users' data
+- Resell or redistribute the Service without permission
+
+Violation of these terms may result in immediate account suspension or termination.
+
+4. SERVICE AVAILABILITY
+
+CloudSync strives for 99.9% uptime but does not guarantee uninterrupted service. We may perform scheduled maintenance with 24-hour notice. Emergency maintenance may occur without notice.
+
+Enterprise customers have a 99.99% uptime SLA with credits for downtime exceeding the SLA.
+
+5. DATA OWNERSHIP
+
+You retain all ownership rights to your content. By using CloudSync, you grant us a license to store, process, and transmit your content solely to provide the Service. We do not claim ownership of your files.
+
+6. DATA DELETION
+
+When you delete files, they are moved to trash for 90 days. After 90 days, or when you empty trash, files are permanently deleted and cannot be recovered.
+
+When you close your account, all data is retained for 30 days to allow account recovery, then permanently deleted.
+
+7. LIMITATION OF LIABILITY
+
+CloudSync is provided 'as is' without warranties. We are not liable for data loss, though we make reasonable efforts to prevent it. You should maintain backups of important data.
+
+Our total liability for any claim is limited to the amount you paid in the past 12 months, or $100, whichever is greater.
+
+8. MODIFICATIONS TO TERMS
+
+We may modify these Terms at any time. Significant changes will be announced via email 30 days before taking effect. Continued use after changes constitutes acceptance.
+
+9. TERMINATION
+
+Either party may terminate this agreement at any time. You may close your account from Settings. We may suspend or terminate accounts for Terms violations after notice.
+
+10. GOVERNING LAW
+
+These Terms are governed by the laws of California, USA. Disputes will be resolved in San Francisco County courts.
+
+Contact
+
+For questions about these Terms: legal@cloudsync.com
