@@ -10,11 +10,11 @@ from rag.ingest import process_document
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Handle S3 event and process uploaded document.
-    
+
     Args:
         event: S3 event notification
         context: Lambda context
-        
+
     Returns:
         Response dictionary
     """
@@ -28,22 +28,22 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "chunk_size": int(os.environ.get("CHUNK_SIZE", "512")),
         "chunk_overlap": int(os.environ.get("CHUNK_OVERLAP", "50")),
     }
-    
+
     db_credentials = get_db_credentials(config["db_secret_name"], config["aws_region"])
-    
+
     for record in event["Records"]:
         bucket = record["s3"]["bucket"]["name"]
         key = record["s3"]["object"]["key"]
-        
+
         print(f"Processing document: s3://{bucket}/{key}")
-        
+
         try:
             result = process_document(bucket, key, config, db_credentials)
             print(f"Success: {json.dumps(result)}")
         except Exception as e:
             print(f"Error processing {key}: {str(e)}")
             raise
-    
+
     return {
         "statusCode": 200,
         "body": json.dumps({"message": "Processing complete"}),

@@ -11,16 +11,16 @@ from rag.query import query_rag
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """Handle query request from API Gateway.
-    
+
     Args:
         event: API Gateway event
         context: Lambda context
-        
+
     Returns:
         API Gateway response
     """
     start_time = time.time()
-    
+
     config = {
         "aws_region": os.environ["AWS_REGION"],
         "db_host": os.environ["DB_HOST"],
@@ -31,26 +31,26 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "llm_model_id": os.environ.get("LLM_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0"),
         "top_k": int(os.environ.get("TOP_K", "5")),
     }
-    
+
     try:
         body = json.loads(event.get("body", "{}"))
         question = body.get("question")
-        
+
         if not question:
             return {
                 "statusCode": 400,
                 "headers": {"Content-Type": "application/json"},
                 "body": json.dumps({"error": "Missing 'question' in request body"}),
             }
-        
+
         db_credentials = get_db_credentials(config["db_secret_name"], config["aws_region"])
-        
+
         result = query_rag(question, config, db_credentials)
-        
+
         latency_ms = (time.time() - start_time) * 1000
-        
+
         result["latency_ms"] = latency_ms
-        
+
         print(json.dumps({
             "metric": "query",
             "latency_ms": latency_ms,
@@ -58,13 +58,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             "output_tokens": result["token_usage"]["output_tokens"],
             "retrieved_chunks": result["retrieved_chunks"],
         }))
-        
+
         return {
             "statusCode": 200,
             "headers": {"Content-Type": "application/json"},
             "body": json.dumps(result),
         }
-        
+
     except Exception as e:
         print(f"Error: {str(e)}")
         return {

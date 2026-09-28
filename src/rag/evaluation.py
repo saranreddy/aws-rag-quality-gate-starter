@@ -14,19 +14,19 @@ def evaluate_correctness(
     region: str,
 ) -> float:
     """Evaluate answer correctness using LLM-as-judge.
-    
+
     Args:
         question: Original question
         answer: Generated answer
         expected_answer: Expected/reference answer
         llm_model_id: Bedrock LLM model ID
         region: AWS region
-        
+
     Returns:
         Correctness score (0.0 to 1.0)
     """
     bedrock = boto3.client("bedrock-runtime", region_name=region)
-    
+
     prompt = f"""Evaluate if the generated answer is correct compared to the expected answer.
 
 Question: {question}
@@ -49,17 +49,17 @@ Output only a JSON object with: {{"score": <number>, "reasoning": "<brief explan
         "max_tokens": 256,
         "messages": [{"role": "user", "content": prompt}],
     })
-    
+
     response = bedrock.invoke_model(
         modelId=llm_model_id,
         body=body,
         contentType="application/json",
         accept="application/json",
     )
-    
+
     result = json.loads(response["body"].read())
     answer_text = result["content"][0]["text"]
-    
+
     try:
         evaluation = json.loads(answer_text)
         return evaluation["score"] / 10.0
@@ -74,20 +74,20 @@ def evaluate_faithfulness(
     region: str,
 ) -> float:
     """Evaluate answer faithfulness/groundedness in context.
-    
+
     Args:
         answer: Generated answer
         context_chunks: Context passages used
         llm_model_id: Bedrock LLM model ID
         region: AWS region
-        
+
     Returns:
         Faithfulness score (0.0 to 1.0)
     """
     bedrock = boto3.client("bedrock-runtime", region_name=region)
-    
+
     context_text = "\n\n".join(context_chunks)
-    
+
     prompt = f"""Evaluate if the answer is faithful to (grounded in) the provided context.
 
 Context:
@@ -110,17 +110,17 @@ Output only a JSON object with: {{"score": <number>, "reasoning": "<brief explan
         "max_tokens": 256,
         "messages": [{"role": "user", "content": prompt}],
     })
-    
+
     response = bedrock.invoke_model(
         modelId=llm_model_id,
         body=body,
         contentType="application/json",
         accept="application/json",
     )
-    
+
     result = json.loads(response["body"].read())
     answer_text = result["content"][0]["text"]
-    
+
     try:
         evaluation = json.loads(answer_text)
         return evaluation["score"] / 10.0
@@ -134,35 +134,35 @@ def evaluate_citation_accuracy(
     expected_sources: List[str],
 ) -> float:
     """Evaluate citation accuracy using deterministic checks.
-    
+
     Args:
         answer: Generated answer
         citations: List of citation dictionaries
         expected_sources: List of expected source documents
-        
+
     Returns:
         Citation accuracy score (0.0 to 1.0)
     """
     if not citations:
         return 0.0 if expected_sources else 1.0
-    
+
     cited_sources = {citation["source"] for citation in citations}
     expected_set = set(expected_sources)
-    
+
     if not expected_set:
         return 1.0 if not cited_sources else 0.8
-    
+
     intersection = cited_sources & expected_set
     union = cited_sources | expected_set
-    
+
     jaccard_score = len(intersection) / len(union) if union else 0.0
-    
+
     has_citations_in_answer = any(
         f"[{citation['number']}]" in answer
         for citation in citations
     )
     citation_usage_score = 1.0 if has_citations_in_answer else 0.5
-    
+
     return (jaccard_score + citation_usage_score) / 2.0
 
 
@@ -172,12 +172,12 @@ def evaluate_single_question(
     config: Dict[str, Any],
 ) -> Dict[str, Any]:
     """Evaluate a single question's answer against expected results.
-    
+
     Args:
         question_data: Dictionary with question, expected_answer, expected_sources
         answer_data: Dictionary with answer, citations from query_rag
         config: Configuration dictionary
-        
+
     Returns:
         Evaluation results with scores
     """
@@ -188,7 +188,7 @@ def evaluate_single_question(
         config["llm_model_id"],
         config["aws_region"],
     )
-    
+
     context_chunks = [citation["snippet"] for citation in answer_data.get("citations", [])]
     faithfulness = evaluate_faithfulness(
         answer_data["answer"],
@@ -196,13 +196,13 @@ def evaluate_single_question(
         config["llm_model_id"],
         config["aws_region"],
     )
-    
+
     citation_accuracy = evaluate_citation_accuracy(
         answer_data["answer"],
         answer_data.get("citations", []),
         question_data.get("expected_sources", []),
     )
-    
+
     return {
         "question": question_data["question"],
         "answer": answer_data["answer"],

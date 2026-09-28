@@ -59,9 +59,10 @@ This starter is for teams building production-ready retrieval-augmented generati
   - Go to AWS Console → Bedrock → Model access → Manage model access
   - Enable access for:
     - **Amazon Titan Text Embeddings v2** (`amazon.titan-embed-text-v2:0`)
-    - **Anthropic Claude 3.5 Sonnet** (`anthropic.claude-3-5-sonnet-20241022-v2:0`)
+    - **Claude Sonnet 5** (`anthropic.claude-sonnet-5`) - open access, current as of Sept 2026
+  - Model IDs verified from: [AWS Bedrock Claude documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html) and [Anthropic Models Overview](https://docs.anthropic.com/en/docs/about-claude/models)
   - Model access approval is instant for most regions
-  - Some models may require business justification or have regional availability
+  - Note: Legacy Claude 3.5 Sonnet models (`anthropic.claude-3-5-sonnet-*`) were retired in March 2026
 
 ## Quick Start
 

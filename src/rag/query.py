@@ -18,7 +18,7 @@ def retrieve_chunks(
     db_password: str,
 ) -> List[Dict[str, Any]]:
     """Retrieve most relevant chunks using vector similarity.
-    
+
     Args:
         question_embedding: Question embedding vector
         top_k: Number of chunks to retrieve
@@ -27,7 +27,7 @@ def retrieve_chunks(
         db_name: Database name
         db_user: Database username
         db_password: Database password
-        
+
     Returns:
         List of chunk dictionaries with metadata
     """
@@ -39,12 +39,12 @@ def retrieve_chunks(
         password=db_password,
     )
     register_vector(conn)
-    
+
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT 
+                SELECT
                     document_id, page_number, chunk_index,
                     chunk_text, start_offset, end_offset,
                     metadata, embedding <-> %s::vector AS distance
@@ -54,7 +54,7 @@ def retrieve_chunks(
                 """,
                 (question_embedding, question_embedding, top_k),
             )
-            
+
             results = []
             for row in cur.fetchall():
                 results.append({
@@ -67,7 +67,7 @@ def retrieve_chunks(
                     "metadata": row[6],
                     "distance": float(row[7]),
                 })
-            
+
             return results
     finally:
         conn.close()
@@ -80,23 +80,23 @@ def generate_answer(
     region: str,
 ) -> Dict[str, Any]:
     """Generate answer with citations using Bedrock LLM.
-    
+
     Args:
         question: User question
         context_chunks: Retrieved context chunks
         llm_model_id: Bedrock LLM model ID
         region: AWS region
-        
+
     Returns:
         Dictionary with answer, citations, and token usage
     """
     bedrock = boto3.client("bedrock-runtime", region_name=region)
-    
+
     context_text = "\n\n".join([
         f"[{i+1}] (Source: {chunk['document_id']}, Page: {chunk['page_number']})\n{chunk['chunk_text']}"
         for i, chunk in enumerate(context_chunks)
     ])
-    
+
     prompt = f"""You are a helpful assistant that answers questions based ONLY on the provided context.
 
 Context passages (numbered for citation):
@@ -122,18 +122,18 @@ Answer:"""
             }
         ],
     })
-    
+
     response = bedrock.invoke_model(
         modelId=llm_model_id,
         body=body,
         contentType="application/json",
         accept="application/json",
     )
-    
+
     result = json.loads(response["body"].read())
-    
+
     answer_text = result["content"][0]["text"]
-    
+
     citations = []
     for i, chunk in enumerate(context_chunks):
         citation_marker = f"[{i+1}]"
@@ -144,7 +144,7 @@ Answer:"""
                 "page": chunk["page_number"],
                 "snippet": chunk["chunk_text"][:200] + "..." if len(chunk["chunk_text"]) > 200 else chunk["chunk_text"],
             })
-    
+
     return {
         "answer": answer_text,
         "citations": citations,
@@ -161,23 +161,23 @@ def query_rag(
     db_credentials: Dict[str, str],
 ) -> Dict[str, Any]:
     """Query the RAG system: embed question, retrieve chunks, generate answer.
-    
+
     Args:
         question: User question
         config: Configuration dictionary
         db_credentials: Database credentials
-        
+
     Returns:
         Dictionary with answer, citations, and metadata
     """
     from .ingest import embed_text
-    
+
     question_embedding = embed_text(
         question,
         config["embedding_model_id"],
         config["aws_region"],
     )
-    
+
     chunks = retrieve_chunks(
         question_embedding,
         config.get("top_k", 5),
@@ -187,7 +187,7 @@ def query_rag(
         db_credentials["username"],
         db_credentials["password"],
     )
-    
+
     if not chunks:
         return {
             "answer": "I don't know based on the provided documents.",
@@ -195,13 +195,13 @@ def query_rag(
             "token_usage": {"input_tokens": 0, "output_tokens": 0},
             "retrieved_chunks": 0,
         }
-    
+
     result = generate_answer(
         question,
         chunks,
         config["llm_model_id"],
         config["aws_region"],
     )
-    
+
     result["retrieved_chunks"] = len(chunks)
     return result

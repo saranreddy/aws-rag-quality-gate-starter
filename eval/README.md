@@ -4,8 +4,19 @@ This directory contains the evaluation dataset and sample documents for the qual
 
 ## Structure
 
-- `dataset.jsonl`: Test questions with expected answers and sources
-- `documents/`: Sample document corpus for testing
+- `dataset.jsonl`: 21 test questions with expected answers and sources
+- `documents/`: Sample CloudSync SaaS help center documentation
+
+## Sample Documents
+
+The corpus includes 4 documents for a fictional cloud storage company (CloudSync):
+
+1. **product-features.md**: Product features, pricing plans, supported file types (Markdown)
+2. **privacy-policy.txt**: Privacy policy, data collection, user rights (Plain text)
+3. **api-documentation.md**: API endpoints, authentication, rate limits (Markdown)
+4. **support-faq.txt**: Frequently asked questions, account/billing, technical support (Plain text)
+
+These documents cover typical SaaS help center content: features, pricing, security, APIs, and support.
 
 ## Dataset Format
 
@@ -19,18 +30,43 @@ Each line in `dataset.jsonl` is a JSON object with:
 }
 ```
 
+**21 questions total**:
+- 18 answerable questions with expected sources
+- 3 unanswerable questions (expected: "I don't know based on the provided documents")
+
+## Evaluation Metrics
+
+The quality gate evaluates three dimensions:
+
+1. **Correctness** (LLM-as-judge): Does the answer match the expected answer?
+2. **Faithfulness** (LLM-as-judge): Is the answer grounded in the retrieved context?
+3. **Citation Accuracy** (deterministic): Do citations reference the expected sources?
+
+Default thresholds (configurable in `config/config.yaml`):
+- Correctness: 0.7
+- Faithfulness: 0.8
+- Citation Accuracy: 0.9
+
 ## Usage
 
-The evaluation script (`scripts/run_eval.py`) uses this dataset to:
-1. Query the RAG system with each question
-2. Evaluate correctness (vs expected_answer)
-3. Evaluate faithfulness (answer grounded in retrieved context)
-4. Evaluate citation accuracy (citations match expected_sources)
+Upload evaluation documents to S3:
+
+```bash
+aws s3 cp eval/documents/ s3://YOUR-DOCUMENTS-BUCKET/ --recursive
+```
+
+Wait for ingestion to complete (check CloudWatch Logs), then run:
+
+```bash
+python scripts/run_eval.py
+```
 
 ## Adding Test Cases
 
-To add more test cases:
+To expand the dataset:
 
-1. Add corresponding documents to `documents/`
-2. Append questions to `dataset.jsonl`
-3. Ensure expected_sources match document filenames
+1. Add new documents to `documents/` (supports .md, .txt, .pdf)
+2. Upload to S3 and wait for ingestion
+3. Append questions to `dataset.jsonl` with expected answers and sources
+4. Include some unanswerable questions (empty expected_sources)
+5. Run evaluation and adjust thresholds if needed

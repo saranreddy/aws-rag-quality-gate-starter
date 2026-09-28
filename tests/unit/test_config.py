@@ -1,8 +1,9 @@
 """Tests for configuration management."""
 
-import pytest
 import tempfile
 from pathlib import Path
+
+import pytest
 
 from src.rag.config import load_config, validate_config
 
@@ -56,11 +57,11 @@ db_name: ragdb
 embedding_model_id: amazon.titan-embed-text-v2:0
 llm_model_id: anthropic.claude-3-5-sonnet-20241022-v2:0
 """
-    
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
         f.write(config_content)
         temp_path = f.name
-    
+
     try:
         config = load_config(temp_path)
         assert config["aws_region"] == "us-east-1"
