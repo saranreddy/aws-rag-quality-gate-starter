@@ -1,0 +1,37 @@
+# AWS Configuration
+# IMPORTANT: aws_region must match your AWS CLI default region and Terraform region
+aws_region: us-east-1
+
+# Database Configuration (from Terraform outputs)
+db_host: your-aurora-cluster.cluster-xxxxx.us-east-1.rds.amazonaws.com
+db_port: 5432
+db_name: ragdb
+db_secret_name: rag-db-credentials
+
+# S3 Configuration (from Terraform outputs)
+documents_bucket: rag-documents-123456789012
+artifacts_bucket: rag-artifacts-123456789012
+
+# Lambda Configuration (from Terraform outputs)
+ingest_function_name: rag-ingest-processor
+query_function_name: rag-query-handler
+
+# API Gateway Configuration (from Terraform outputs)
+api_gateway_url: https://xxxxx.execute-api.us-east-1.amazonaws.com
+
+# Bedrock Configuration
+embedding_model_id: amazon.titan-embed-text-v2:0
+llm_model_id: anthropic.claude-3-5-sonnet-20241022-v2:0
+
+# Retrieval Configuration
+top_k: 5
+chunk_size: 512
+chunk_overlap: 50
+
+# Evaluation Configuration
+eval_dataset_path: eval/dataset.jsonl
+eval_documents_path: eval/documents/
+eval_thresholds:
+  correctness: 0.7
+  faithfulness: 0.8
+  citation_accuracy: 0.9

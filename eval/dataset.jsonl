@@ -1,0 +1,3 @@
+{"question": "What is the capital of France?", "expected_answer": "Paris is the capital of France.", "expected_sources": ["geography.pdf"]}
+{"question": "When was the Declaration of Independence signed?", "expected_answer": "The Declaration of Independence was signed on July 4, 1776.", "expected_sources": ["history.pdf"]}
+{"question": "What is photosynthesis?", "expected_answer": "Photosynthesis is the process by which plants use sunlight, water, and carbon dioxide to produce oxygen and energy in the form of sugar.", "expected_sources": ["biology.pdf"]}
