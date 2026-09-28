@@ -3,13 +3,15 @@
 
 import json
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
+from urllib import request
+from urllib.error import URLError
 
-from src.rag.config import get_db_credentials, load_config
+from src.rag.config import load_config
 from src.rag.evaluation import evaluate_single_question
-from src.rag.query import query_rag
 
 
 def load_eval_dataset(dataset_path: str) -> List[Dict[str, Any]]:
@@ -28,29 +30,60 @@ def load_eval_dataset(dataset_path: str) -> List[Dict[str, Any]]:
     return questions
 
 
+def query_api(api_url: str, question: str, timeout: int = 60) -> Dict[str, Any]:
+    """Call the deployed query API endpoint.
+
+    Args:
+        api_url: API Gateway URL
+        question: Question to query
+        timeout: Request timeout in seconds
+
+    Returns:
+        Query response dictionary
+    """
+    req_data = json.dumps({"question": question}).encode("utf-8")
+    req = request.Request(
+        f"{api_url}/query",
+        data=req_data,
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+
+    start_time = time.time()
+    try:
+        with request.urlopen(req, timeout=timeout) as response:
+            elapsed = time.time() - start_time
+            result = json.loads(response.read().decode("utf-8"))
+            if elapsed > timeout * 0.9:
+                print(f"  Warning: Query took {elapsed:.1f}s (near timeout)")
+            return result
+    except URLError as e:
+        print(f"  Error calling API: {e}")
+        raise
+
+
 def run_evaluation(config: Dict[str, Any]) -> Dict[str, Any]:
     """Run full evaluation against the RAG system.
 
     Args:
-        config: Configuration dictionary
+        config: Configuration dictionary (must include api_url)
 
     Returns:
         Evaluation results
     """
+    api_url = config.get("api_url")
+    if not api_url:
+        raise ValueError("api_url must be set in config for evaluation")
+
     dataset_path = config.get("eval_dataset_path", "eval/dataset.jsonl")
     questions = load_eval_dataset(dataset_path)
-
-    db_credentials = get_db_credentials(
-        config["db_secret_name"],
-        config["aws_region"],
-    )
 
     results = []
 
     for i, question_data in enumerate(questions):
         print(f"\nEvaluating question {i+1}/{len(questions)}: {question_data['question'][:60]}...")
 
-        answer_data = query_rag(question_data["question"], config, db_credentials)
+        answer_data = query_api(api_url, question_data["question"])
 
         eval_result = evaluate_single_question(question_data, answer_data, config)
         results.append(eval_result)

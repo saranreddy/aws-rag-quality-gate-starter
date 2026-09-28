@@ -18,8 +18,10 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Returns:
         Response dictionary
     """
+    region = context.invoked_function_arn.split(":")[3]
+
     config = {
-        "aws_region": os.environ["AWS_REGION"],
+        "aws_region": region,
         "db_host": os.environ["DB_HOST"],
         "db_port": int(os.environ.get("DB_PORT", "5432")),
         "db_name": os.environ.get("DB_NAME", "ragdb"),

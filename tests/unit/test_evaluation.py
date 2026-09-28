@@ -6,6 +6,7 @@ from src.rag.evaluation import (
     evaluate_citation_accuracy,
     evaluate_correctness,
     evaluate_faithfulness,
+    parse_judge_response,
 )
 
 
@@ -102,3 +103,57 @@ def test_evaluate_citation_accuracy_no_expected():
     score = evaluate_citation_accuracy(answer, citations, expected_sources)
 
     assert score == 1.0
+
+
+def test_parse_judge_response_plain_json():
+    """Test parsing plain JSON response."""
+    response = '{"score": 8, "reasoning": "Good"}'
+    score, success = parse_judge_response(response)
+
+    assert success is True
+    assert score == 0.8
+
+
+def test_parse_judge_response_markdown_fence():
+    """Test parsing JSON wrapped in markdown code fence."""
+    response = '```json\n{"score": 7, "reasoning": "Pretty good"}\n```'
+    score, success = parse_judge_response(response)
+
+    assert success is True
+    assert score == 0.7
+
+
+def test_parse_judge_response_markdown_fence_no_lang():
+    """Test parsing JSON in markdown fence without language tag."""
+    response = '```\n{"score": 9, "reasoning": "Excellent"}\n```'
+    score, success = parse_judge_response(response)
+
+    assert success is True
+    assert score == 0.9
+
+
+def test_parse_judge_response_with_text():
+    """Test parsing JSON with extra text around markdown fence."""
+    response = 'Here is my evaluation:\n```json\n{"score": 6, "reasoning": "OK"}\n```\nDone.'
+    score, success = parse_judge_response(response)
+
+    assert success is True
+    assert score == 0.6
+
+
+def test_parse_judge_response_invalid_json():
+    """Test parsing invalid JSON returns failure."""
+    response = '{"score": invalid}'
+    score, success = parse_judge_response(response)
+
+    assert success is False
+    assert score == 0.0
+
+
+def test_parse_judge_response_missing_score():
+    """Test parsing JSON without score field returns failure."""
+    response = '{"reasoning": "No score here"}'
+    score, success = parse_judge_response(response)
+
+    assert success is False
+    assert score == 0.0

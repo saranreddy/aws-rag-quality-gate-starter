@@ -1,7 +1,8 @@
 # Random password for database
 resource "random_password" "db_password" {
-  length  = 32
-  special = true
+  length           = 32
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
 # Secrets Manager secret for database credentials
@@ -30,7 +31,7 @@ resource "aws_rds_cluster" "aurora" {
   cluster_identifier     = "${var.project_name}-aurora-cluster"
   engine                 = "aurora-postgresql"
   engine_mode            = "provisioned"
-  engine_version         = "15.5"
+  engine_version         = var.aurora_engine_version
   database_name          = var.db_name
   master_username        = var.db_username
   master_password        = random_password.db_password.result
@@ -49,8 +50,20 @@ resource "aws_rds_cluster" "aurora" {
 
   enabled_cloudwatch_logs_exports = ["postgresql"]
 
+  depends_on = [aws_cloudwatch_log_group.aurora_postgresql]
+
   tags = {
     Name = "RAG Aurora Cluster"
+  }
+}
+
+# CloudWatch Log Group for Aurora PostgreSQL logs
+resource "aws_cloudwatch_log_group" "aurora_postgresql" {
+  name              = "/aws/rds/cluster/${var.project_name}-aurora-cluster/postgresql"
+  retention_in_days = 7
+
+  tags = {
+    Name = "Aurora PostgreSQL Logs"
   }
 }
 
@@ -70,12 +83,12 @@ resource "aws_rds_cluster_instance" "aurora" {
 resource "aws_lambda_function" "db_init" {
   function_name = "${var.project_name}-db-init"
   role          = aws_iam_role.lambda_exec.arn
-  handler       = "index.handler"
+  handler       = "db_init.handler"
   runtime       = "python3.11"
   timeout       = 60
 
-  filename         = data.archive_file.db_init_zip.output_path
-  source_code_hash = data.archive_file.db_init_zip.output_base64sha256
+  filename         = data.archive_file.db_init_package.output_path
+  source_code_hash = data.archive_file.db_init_package.output_base64sha256
 
   vpc_config {
     subnet_ids         = aws_subnet.private[*].id
@@ -85,7 +98,6 @@ resource "aws_lambda_function" "db_init" {
   environment {
     variables = {
       DB_SECRET_NAME = aws_secretsmanager_secret.db_credentials.name
-      AWS_REGION     = var.aws_region
     }
   }
 
@@ -96,16 +108,6 @@ resource "aws_lambda_function" "db_init" {
   depends_on = [aws_rds_cluster_instance.aurora]
 }
 
-# Archive the db init script
-data "archive_file" "db_init_zip" {
-  type        = "zip"
-  output_path = "${path.module}/.terraform/db_init.zip"
-
-  source {
-    content  = file("${path.module}/db_init.py")
-    filename = "index.py"
-  }
-}
 
 # Invoke db init Lambda once to set up schema
 resource "aws_lambda_invocation" "db_init" {
@@ -115,5 +117,9 @@ resource "aws_lambda_invocation" "db_init" {
     action = "init"
   })
 
-  depends_on = [aws_lambda_function.db_init]
+  depends_on = [
+    aws_lambda_function.db_init,
+    aws_secretsmanager_secret_version.db_credentials,
+    aws_cloudwatch_log_group.db_init,
+  ]
 }

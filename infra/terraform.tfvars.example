@@ -12,8 +12,16 @@ db_min_capacity = 0.5
 db_max_capacity = 2
 
 # Bedrock Model IDs
+# Note: Anthropic models require submitting the Anthropic use-case form in Bedrock console
 embedding_model_id = "amazon.titan-embed-text-v2:0"
-llm_model_id       = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+llm_model_id       = "us.anthropic.claude-sonnet-4-6"
+
+# Aurora Configuration
+aurora_engine_version = "15.15"
+
+# S3 Buckets
+# Set to false for production to prevent accidental data loss
+force_destroy_buckets = true
 
 # RAG Configuration
 chunk_size    = 512

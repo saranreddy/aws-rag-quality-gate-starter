@@ -18,7 +18,7 @@ This starter is for teams building production-ready retrieval-augmented generati
 - Vector search on your own documents without vendor lock-in to managed services
 - Automated evaluation gates to catch regressions before deployment
 - Infrastructure-as-code for reproducible RAG deployments
-- Cost-effective serverless architecture that scales to zero
+- Cost-effective serverless architecture with automatic scaling (Aurora scales from 0.5 ACU minimum)
 
 **Common in these contexts:**
 - Legal tech, compliance, and regulated industries requiring citation traceability
@@ -36,11 +36,11 @@ This starter is for teams building production-ready retrieval-augmented generati
 
 - **Production RAG Pipeline** with document upload → ingest → chunk → embed → query with citations
 - **Vector Database** using Aurora PostgreSQL Serverless v2 with pgvector (self-managed, no vendor lock-in)
-- **Amazon Bedrock Integration** for embeddings (Titan v2) and LLM (Claude 3.5 Sonnet)
+- **Amazon Bedrock Integration** for embeddings (Titan v2) and LLM (Claude via cross-region inference profiles)
 - **Automated Quality Gate** with LLM-as-judge evaluation (correctness, faithfulness, citation accuracy)
 - **Infrastructure as Code** with Terraform (VPC, Lambda, Aurora, API Gateway, CloudWatch)
 - **CI/CD Ready** with GitHub Actions for linting, testing, Terraform validation, and evaluation gates
-- **Cost-Conscious** with Aurora serverless scaling and Lambda cold starts
+- **Cost-Conscious** with Aurora serverless scaling (0.5 ACU minimum) and Lambda pay-per-use
 - **Citation Tracking** with source document, page number, and snippet for every answer
 
 ## Architecture
@@ -58,11 +58,11 @@ This starter is for teams building production-ready retrieval-augmented generati
 - **Bedrock Model Access** enabled in AWS Console (⚠️ **Required before deployment**):
   - Go to AWS Console → Bedrock → Model access → Manage model access
   - Enable access for:
-    - **Amazon Titan Text Embeddings v2** (`amazon.titan-embed-text-v2:0`)
-    - **Claude Sonnet 5** (`anthropic.claude-sonnet-5`) - open access, current as of Sept 2026
-  - Model IDs verified from: [AWS Bedrock Claude documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html) and [Anthropic Models Overview](https://docs.anthropic.com/en/docs/about-claude/models)
-  - Model access approval is instant for most regions
-  - Note: Legacy Claude 3.5 Sonnet models (`anthropic.claude-3-5-sonnet-*`) were retired in March 2026
+    - **Amazon Titan Text Embeddings v2** (`amazon.titan-embed-text-v2:0`) - open access
+    - **Anthropic Claude models** require submitting the **one-time Anthropic use-case form** in the Bedrock console before any Claude model can be invoked
+  - This starter uses cross-region inference profiles (e.g. `us.anthropic.claude-sonnet-4-6`) for improved availability
+  - Model IDs verified from: [AWS Bedrock Claude documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html)
+  - Model access approval is typically instant for Titan; Anthropic form approval may take a few minutes
 
 ## Quick Start
 
@@ -80,7 +80,20 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Step 2: Deploy Infrastructure with Terraform
+### Step 2: Build Lambda Deployment Packages
+
+Before deploying, build the Lambda packages with their dependencies:
+
+```bash
+# From the project root
+./scripts/build_lambdas.sh
+```
+
+This creates deployment packages in `infra/build/` with all required Python dependencies (psycopg2, pgvector, pypdf, etc.) compiled for the Lambda runtime.
+
+**Note**: The build script requires Docker or a Linux environment for `manylinux2014_x86_64` binaries. On macOS/Windows, the pip install uses platform-specific flags to ensure Lambda compatibility.
+
+### Step 3: Deploy Infrastructure with Terraform
 
 ```bash
 cd infra
@@ -107,7 +120,7 @@ terraform output
 
 Copy these to `config/config.yaml` in the next step.
 
-### Step 3: Configure the RAG System
+### Step 4: Configure the RAG System
 
 ```bash
 cd ..
@@ -127,7 +140,7 @@ api_gateway_url: <api_gateway_url from terraform output>
 # ... (see config.example.yaml for full structure)
 ```
 
-### Step 4: Upload and Ingest Documents
+### Step 5: Upload and Ingest Documents
 
 Upload a PDF to the documents bucket (triggers automatic ingestion):
 
@@ -141,7 +154,7 @@ Monitor ingestion in CloudWatch Logs:
 aws logs tail /aws/lambda/rag-quality-gate-ingest-processor --follow
 ```
 
-### Step 5: Query the API
+### Step 6: Query the API
 
 ```bash
 curl -X POST $(cd infra && terraform output -raw query_endpoint) \
@@ -179,7 +192,7 @@ curl -X POST $(cd infra && terraform output -raw query_endpoint) \
 }
 ```
 
-### Step 6: Run Evaluation Quality Gate
+### Step 7: Run Evaluation Quality Gate
 
 Upload evaluation documents:
 

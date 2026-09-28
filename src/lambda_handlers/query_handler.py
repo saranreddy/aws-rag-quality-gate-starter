@@ -21,14 +21,16 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     start_time = time.time()
 
+    region = context.invoked_function_arn.split(":")[3]
+
     config = {
-        "aws_region": os.environ["AWS_REGION"],
+        "aws_region": region,
         "db_host": os.environ["DB_HOST"],
         "db_port": int(os.environ.get("DB_PORT", "5432")),
         "db_name": os.environ.get("DB_NAME", "ragdb"),
         "db_secret_name": os.environ["DB_SECRET_NAME"],
         "embedding_model_id": os.environ.get("EMBEDDING_MODEL_ID", "amazon.titan-embed-text-v2:0"),
-        "llm_model_id": os.environ.get("LLM_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0"),
+        "llm_model_id": os.environ.get("LLM_MODEL_ID", "us.anthropic.claude-sonnet-4-6"),
         "top_k": int(os.environ.get("TOP_K", "5")),
     }
 

@@ -83,7 +83,7 @@ resource "aws_iam_role_policy_attachment" "lambda_secrets_access" {
 # Policy for Lambda to invoke Bedrock
 resource "aws_iam_policy" "lambda_bedrock_access" {
   name        = "${var.project_name}-lambda-bedrock-access"
-  description = "Allow Lambda to invoke Bedrock models"
+  description = "Allow Lambda to invoke Bedrock models and inference profiles"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -95,7 +95,8 @@ resource "aws_iam_policy" "lambda_bedrock_access" {
         ]
         Resource = [
           "arn:aws:bedrock:${var.aws_region}::foundation-model/${var.embedding_model_id}",
-          "arn:aws:bedrock:${var.aws_region}::foundation-model/${var.llm_model_id}"
+          "arn:aws:bedrock:*:${data.aws_caller_identity.current.account_id}:inference-profile/*",
+          "arn:aws:bedrock:*::foundation-model/*"
         ]
       }
     ]

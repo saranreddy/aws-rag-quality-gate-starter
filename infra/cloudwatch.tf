@@ -8,8 +8,8 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric"
         properties = {
           metrics = [
-            ["AWS/Lambda", "Invocations", { stat = "Sum", label = "Ingest Invocations" }],
-            [".", ".", { stat = "Sum", label = "Query Invocations" }]
+            ["AWS/Lambda", "Invocations", { stat = "Sum", label = "Ingest Invocations", dimensions = { FunctionName = aws_lambda_function.ingest.function_name } }],
+            [".", ".", { stat = "Sum", label = "Query Invocations", dimensions = { FunctionName = aws_lambda_function.query.function_name } }]
           ]
           period = 300
           stat   = "Sum"
@@ -21,7 +21,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric"
         properties = {
           metrics = [
-            ["AWS/Lambda", "Duration", { stat = "Average", label = "Query Latency (ms)" }]
+            ["AWS/Lambda", "Duration", { stat = "Average", label = "Query Latency (ms)", dimensions = { FunctionName = aws_lambda_function.query.function_name } }]
           ]
           period = 300
           stat   = "Average"
@@ -38,8 +38,8 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric"
         properties = {
           metrics = [
-            ["AWS/Lambda", "Errors", { stat = "Sum", label = "Ingest Errors" }],
-            [".", ".", { stat = "Sum", label = "Query Errors" }]
+            ["AWS/Lambda", "Errors", { stat = "Sum", label = "Ingest Errors", dimensions = { FunctionName = aws_lambda_function.ingest.function_name } }],
+            [".", ".", { stat = "Sum", label = "Query Errors", dimensions = { FunctionName = aws_lambda_function.query.function_name } }]
           ]
           period = 300
           stat   = "Sum"

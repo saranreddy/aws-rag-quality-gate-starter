@@ -47,9 +47,9 @@ def retrieve_chunks(
                 SELECT
                     document_id, page_number, chunk_index,
                     chunk_text, start_offset, end_offset,
-                    metadata, embedding <-> %s::vector AS distance
+                    metadata, embedding <=> %s::vector AS distance
                 FROM document_chunks
-                ORDER BY embedding <-> %s::vector
+                ORDER BY embedding <=> %s::vector
                 LIMIT %s
                 """,
                 (question_embedding, question_embedding, top_k),
@@ -143,6 +143,7 @@ Answer:"""
                 "source": chunk["document_id"],
                 "page": chunk["page_number"],
                 "snippet": chunk["chunk_text"][:200] + "..." if len(chunk["chunk_text"]) > 200 else chunk["chunk_text"],
+                "full_text": chunk["chunk_text"],
             })
 
     return {

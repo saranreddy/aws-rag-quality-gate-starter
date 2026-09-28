@@ -3,6 +3,7 @@
 import json
 import os
 from typing import Any, Dict, List, Tuple
+from urllib.parse import unquote_plus
 
 import boto3
 import psycopg2
@@ -95,6 +96,7 @@ def embed_text(text: str, model_id: str, region: str) -> List[float]:
 
 def store_chunks(
     chunks: List[Dict[str, Any]],
+    document_id: str,
     db_host: str,
     db_port: int,
     db_name: str,
@@ -103,8 +105,11 @@ def store_chunks(
 ) -> None:
     """Store document chunks with embeddings in PostgreSQL.
 
+    Deletes existing chunks for the document_id before inserting new ones.
+
     Args:
         chunks: List of chunk dictionaries with text, embedding, and metadata
+        document_id: Document identifier to delete/replace
         db_host: Database host
         db_port: Database port
         db_name: Database name
@@ -122,6 +127,12 @@ def store_chunks(
 
     try:
         with conn.cursor() as cur:
+            # Delete existing chunks for this document to avoid duplicates on re-ingest
+            cur.execute(
+                "DELETE FROM document_chunks WHERE document_id = %s",
+                (document_id,)
+            )
+
             for chunk in chunks:
                 cur.execute(
                     """
@@ -157,13 +168,16 @@ def process_document(
 
     Args:
         s3_bucket: S3 bucket name
-        s3_key: S3 object key
+        s3_key: S3 object key (URL-encoded from S3 event)
         config: Configuration dictionary
         db_credentials: Database credentials
 
     Returns:
         Processing result summary
     """
+    # URL-decode the S3 key (S3 events deliver URL-encoded keys)
+    s3_key = unquote_plus(s3_key)
+
     s3 = boto3.client("s3", region_name=config["aws_region"])
 
     local_path = f"/tmp/{os.path.basename(s3_key)}"
@@ -212,6 +226,7 @@ def process_document(
 
     store_chunks(
         all_chunks,
+        s3_key,
         config["db_host"],
         config.get("db_port", 5432),
         config.get("db_name", "ragdb"),

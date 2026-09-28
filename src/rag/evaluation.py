@@ -1,9 +1,38 @@
 """Evaluation framework: LLM-as-judge for correctness, faithfulness, and citation accuracy."""
 
 import json
-from typing import Any, Dict, List
+import re
+from typing import Any, Dict, List, Tuple
 
 import boto3
+
+
+def parse_judge_response(response_text: str) -> Tuple[float, bool]:
+    """Parse judge response, handling markdown code fences.
+
+    Args:
+        response_text: Raw response from judge LLM
+
+    Returns:
+        Tuple of (score_0_to_1, parse_success)
+    """
+    # Try to extract JSON from markdown code fences
+    json_match = re.search(r'```(?:json)?\s*\n?\s*(\{.*?\})\s*\n?```', response_text, re.DOTALL)
+    if json_match:
+        json_str = json_match.group(1)
+    else:
+        json_str = response_text.strip()
+
+    try:
+        evaluation = json.loads(json_str)
+        score = evaluation.get("score")
+        if score is None:
+            return 0.0, False
+        return float(score) / 10.0, True
+    except (json.JSONDecodeError, ValueError, KeyError) as e:
+        print(f"Warning: Failed to parse judge response: {e}")
+        print(f"Raw response: {response_text[:200]}")
+        return 0.0, False
 
 
 def evaluate_correctness(
@@ -60,11 +89,10 @@ Output only a JSON object with: {{"score": <number>, "reasoning": "<brief explan
     result = json.loads(response["body"].read())
     answer_text = result["content"][0]["text"]
 
-    try:
-        evaluation = json.loads(answer_text)
-        return evaluation["score"] / 10.0
-    except (json.JSONDecodeError, KeyError):
-        return 0.5
+    score, success = parse_judge_response(answer_text)
+    if not success:
+        print(f"Warning: Correctness judge parse failed for question: {question[:50]}...")
+    return score
 
 
 def evaluate_faithfulness(
@@ -121,11 +149,10 @@ Output only a JSON object with: {{"score": <number>, "reasoning": "<brief explan
     result = json.loads(response["body"].read())
     answer_text = result["content"][0]["text"]
 
-    try:
-        evaluation = json.loads(answer_text)
-        return evaluation["score"] / 10.0
-    except (json.JSONDecodeError, KeyError):
-        return 0.5
+    score, success = parse_judge_response(answer_text)
+    if not success:
+        print(f"Warning: Faithfulness judge parse failed for answer: {answer[:50]}...")
+    return score
 
 
 def evaluate_citation_accuracy(
@@ -189,7 +216,8 @@ def evaluate_single_question(
         config["aws_region"],
     )
 
-    context_chunks = [citation["snippet"] for citation in answer_data.get("citations", [])]
+    # Pass full chunk text to faithfulness judge instead of truncated snippets
+    context_chunks = [citation.get("full_text", citation["snippet"]) for citation in answer_data.get("citations", [])]
     faithfulness = evaluate_faithfulness(
         answer_data["answer"],
         context_chunks if context_chunks else ["No context retrieved"],

@@ -1,8 +1,22 @@
 # Package Lambda functions
-data "archive_file" "lambda_package" {
+# Note: Run scripts/build_lambdas.sh before terraform apply to build dependencies
+
+data "archive_file" "db_init_package" {
   type        = "zip"
-  output_path = "${path.module}/.terraform/lambda_package.zip"
-  source_dir  = "${path.module}/../src"
+  output_path = "${path.module}/.terraform/db_init_package.zip"
+  source_dir  = "${path.module}/build/db_init"
+}
+
+data "archive_file" "ingest_package" {
+  type        = "zip"
+  output_path = "${path.module}/.terraform/ingest_package.zip"
+  source_dir  = "${path.module}/build/ingest"
+}
+
+data "archive_file" "query_package" {
+  type        = "zip"
+  output_path = "${path.module}/.terraform/query_package.zip"
+  source_dir  = "${path.module}/build/query"
 }
 
 # Ingest Lambda function
@@ -14,8 +28,8 @@ resource "aws_lambda_function" "ingest" {
   timeout       = 300
   memory_size   = 512
 
-  filename         = data.archive_file.lambda_package.output_path
-  source_code_hash = data.archive_file.lambda_package.output_base64sha256
+  filename         = data.archive_file.ingest_package.output_path
+  source_code_hash = data.archive_file.ingest_package.output_base64sha256
 
   vpc_config {
     subnet_ids         = aws_subnet.private[*].id
@@ -28,7 +42,6 @@ resource "aws_lambda_function" "ingest" {
       DB_PORT            = "5432"
       DB_NAME            = var.db_name
       DB_SECRET_NAME     = aws_secretsmanager_secret.db_credentials.name
-      AWS_REGION         = var.aws_region
       EMBEDDING_MODEL_ID = var.embedding_model_id
       CHUNK_SIZE         = tostring(var.chunk_size)
       CHUNK_OVERLAP      = tostring(var.chunk_overlap)
@@ -58,8 +71,8 @@ resource "aws_lambda_function" "query" {
   timeout       = 60
   memory_size   = 512
 
-  filename         = data.archive_file.lambda_package.output_path
-  source_code_hash = data.archive_file.lambda_package.output_base64sha256
+  filename         = data.archive_file.query_package.output_path
+  source_code_hash = data.archive_file.query_package.output_base64sha256
 
   vpc_config {
     subnet_ids         = aws_subnet.private[*].id
@@ -72,7 +85,6 @@ resource "aws_lambda_function" "query" {
       DB_PORT            = "5432"
       DB_NAME            = var.db_name
       DB_SECRET_NAME     = aws_secretsmanager_secret.db_credentials.name
-      AWS_REGION         = var.aws_region
       EMBEDDING_MODEL_ID = var.embedding_model_id
       LLM_MODEL_ID       = var.llm_model_id
       TOP_K              = tostring(var.top_k)

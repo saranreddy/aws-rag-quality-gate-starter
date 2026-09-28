@@ -1,6 +1,7 @@
 # S3 bucket for document uploads
 resource "aws_s3_bucket" "documents" {
-  bucket = "${var.project_name}-documents-${data.aws_caller_identity.current.account_id}"
+  bucket        = "${var.project_name}-documents-${data.aws_caller_identity.current.account_id}"
+  force_destroy = var.force_destroy_buckets
 
   tags = {
     Name = "RAG Documents Bucket"
@@ -61,7 +62,8 @@ resource "aws_s3_bucket_notification" "documents" {
 
 # S3 bucket for artifacts and Lambda deployment packages
 resource "aws_s3_bucket" "artifacts" {
-  bucket = "${var.project_name}-artifacts-${data.aws_caller_identity.current.account_id}"
+  bucket        = "${var.project_name}-artifacts-${data.aws_caller_identity.current.account_id}"
+  force_destroy = var.force_destroy_buckets
 
   tags = {
     Name = "RAG Artifacts Bucket"

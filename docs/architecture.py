@@ -9,7 +9,6 @@ from diagrams import Cluster, Diagram, Edge
 from diagrams.aws.compute import Lambda
 from diagrams.aws.database import RDSPostgresqlInstance
 from diagrams.aws.general import User
-from diagrams.aws.integration import SimpleNotificationServiceSns
 from diagrams.aws.management import Cloudwatch
 from diagrams.aws.ml import Bedrock
 from diagrams.aws.network import APIGateway
@@ -38,33 +37,33 @@ with Diagram(
     ci = GithubActions("GitHub Actions\nEvaluation\nQuality Gate")
 
     with Cluster("AWS Account", graph_attr={"bgcolor": "#f0f0f0"}):
-        
+
         with Cluster("Ingestion Pipeline"):
             docs_bucket = SimpleStorageServiceS3("Documents\nBucket\n(PDF uploads)")
             ingest_lambda = Lambda("Ingest\nLambda")
-            
+
         with Cluster("Vector Database"):
             aurora = RDSPostgresqlInstance("Aurora\nPostgreSQL\nServerless v2\n(pgvector)")
             secrets = SecretsManager("Secrets\nManager\n(DB creds)")
-        
+
         with Cluster("Query API"):
             api = APIGateway("API Gateway\nHTTP API")
             query_lambda = Lambda("Query\nLambda")
-        
+
         with Cluster("Foundation Models"):
             bedrock = Bedrock("Amazon\nBedrock\n(Titan + Claude)")
-        
+
         with Cluster("Observability"):
             cloudwatch = Cloudwatch("CloudWatch\nMetrics + Logs\n+ Dashboard")
-    
+
     user >> Edge(label="1. Upload PDF") >> docs_bucket
     docs_bucket >> Edge(label="S3 trigger") >> ingest_lambda
     ingest_lambda >> Edge(label="extract, chunk,\nembed") >> bedrock
     ingest_lambda >> Edge(label="store vectors") >> aurora
-    
+
     secrets >> Edge(label="credentials", style="dashed") >> ingest_lambda
     secrets >> Edge(label="credentials", style="dashed") >> query_lambda
-    
+
     engineer >> Edge(label="2. POST /query") >> api
     api >> Edge(label="invoke") >> query_lambda
     query_lambda >> Edge(label="embed question") >> bedrock
@@ -72,9 +71,9 @@ with Diagram(
     query_lambda >> Edge(label="generate answer\nwith citations") >> bedrock
     query_lambda >> Edge(label="JSON response") >> api
     api >> Edge(label="answer +\ncitations") >> engineer
-    
+
     ci >> Edge(label="3. Eval queries\n(correctness,\nfaithfulness,\ncitation accuracy)", color="#e66100", style="dashed") >> api
     api >> Edge(label="block deploy\nif below\nthreshold", color="#e66100", style="dashed") >> ci
-    
+
     ingest_lambda >> Edge(label="logs + metrics", style="dotted") >> cloudwatch
     query_lambda >> Edge(label="logs + metrics", style="dotted") >> cloudwatch

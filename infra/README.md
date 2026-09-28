@@ -17,10 +17,11 @@ This directory contains Terraform configuration for deploying the RAG quality ga
 
 ### Database
 - **Aurora PostgreSQL Serverless v2**: With pgvector extension
-  - Min capacity: 0.5 ACUs (scales to zero when idle)
+  - Min capacity: 0.5 ACUs (does not scale below 0.5 ACU minimum)
   - Max capacity: 2 ACUs
   - Automatic backups enabled (7-day retention)
   - Credentials stored in Secrets Manager
+  - HNSW indexing for fast cosine similarity search
 
 ### Compute
 - **Lambda Functions**:
@@ -58,8 +59,8 @@ This directory contains Terraform configuration for deploying the RAG quality ga
 - **Bedrock Model Access**: Enable model access in AWS Bedrock console
   - Go to AWS Console → Bedrock → Model access
   - Request access to:
-    - Amazon Titan Text Embeddings v2
-    - Anthropic Claude 3.5 Sonnet
+    - Amazon Titan Text Embeddings v2 (open access)
+    - Anthropic Claude models (requires submitting the one-time Anthropic use-case form)
 
 ## Cost Estimate
 
@@ -81,30 +82,47 @@ Rough monthly costs for light usage (~1000 queries/month):
 - Lambda and API Gateway costs scale with usage
 
 **Cost Optimization**:
-- Aurora scales to 0.5 ACU minimum when idle
+- Aurora scales down to 0.5 ACU minimum (does not fully scale to zero)
 - Set lower `db_max_capacity` to cap Aurora costs
 - Lambda cold starts trade latency for cost (vs provisioned concurrency)
+- Consider VPC endpoints to reduce NAT Gateway data transfer costs (see `enable_vpc_endpoints` variable)
 
 **Unverified**: Aurora Serverless v2 minimum 0.5 ACU cost and data transfer rates could not be verified without deploying. Consult AWS pricing calculator for your specific usage patterns.
 
 ## Usage
 
-### Step 1: Initialize
+### Step 1: Build Lambda Packages
+
+Before deploying, build the Lambda deployment packages with dependencies:
+
+```bash
+# From the repository root
+./scripts/build_lambdas.sh
+```
+
+This script:
+- Installs Python dependencies (psycopg2-binary, pgvector, pypdf, etc.) into `infra/build/` directories
+- Uses `--platform manylinux2014_x86_64 --python-version 3.11 --only-binary=:all:` to ensure Lambda compatibility
+- Creates separate packages for db_init, ingest, and query Lambdas
+
+**Note**: Run this script any time you change Python dependencies.
+
+### Step 2: Initialize
 
 ```bash
 terraform init
 ```
 
-### Step 2: Customize Variables
+### Step 3: Customize Variables
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars with your desired values
 ```
 
-**Important**: Ensure you have Bedrock model access enabled (see Prerequisites).
+**Important**: Ensure you have Bedrock model access enabled (see Prerequisites) and you've run the build script.
 
-### Step 3: Plan
+### Step 4: Plan
 
 ```bash
 terraform plan
@@ -112,7 +130,7 @@ terraform plan
 
 Review the planned changes. Terraform will create ~50 resources.
 
-### Step 4: Apply
+### Step 5: Apply
 
 ```bash
 terraform apply
@@ -120,7 +138,7 @@ terraform apply
 
 Type `yes` when prompted. Deployment takes ~10-15 minutes (mostly Aurora cluster creation).
 
-### Step 5: Get Outputs
+### Step 6: Get Outputs
 
 ```bash
 terraform output
@@ -139,7 +157,7 @@ artifacts_bucket: <artifacts_bucket>
 api_gateway_url: <api_gateway_url>
 ```
 
-### Step 6: Test the Deployment
+### Step 7: Test the Deployment
 
 Upload a PDF to the documents bucket:
 

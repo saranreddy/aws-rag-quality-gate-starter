@@ -35,9 +35,21 @@ variable "embedding_model_id" {
 }
 
 variable "llm_model_id" {
-  description = "Bedrock LLM model ID (ensure model access is enabled in Bedrock console)"
+  description = "Bedrock LLM inference profile ID (requires Anthropic use-case form submission in Bedrock console)"
   type        = string
-  default     = "anthropic.claude-sonnet-5"
+  default     = "us.anthropic.claude-sonnet-4-6"
+}
+
+variable "aurora_engine_version" {
+  description = "Aurora PostgreSQL engine version"
+  type        = string
+  default     = "15.15"
+}
+
+variable "force_destroy_buckets" {
+  description = "Allow Terraform to destroy S3 buckets with contents (set false for production)"
+  type        = bool
+  default     = true
 }
 
 variable "enable_vpc_endpoints" {
