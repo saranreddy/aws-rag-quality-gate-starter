@@ -199,7 +199,9 @@ terraform destroy
 
 ### Lambda ENI Cleanup Delay
 
-Lambda functions in VPCs create Elastic Network Interfaces (ENIs) that can take 10-15 minutes to detach after function deletion. During `terraform destroy`, you may see:
+Lambda functions in VPCs create Elastic Network Interfaces (ENIs) that take 10-15 minutes to detach after function deletion. During `terraform destroy`, ENIs stay "in-use" for ~19 minutes, then transition to "available" and can be deleted.
+
+During destroy you'll see:
 
 ```
 aws_subnet.private[0]: Still destroying... [12m30s elapsed]
@@ -208,14 +210,26 @@ aws_security_group.lambda: Still destroying... [12m30s elapsed]
 
 This is normal. Terraform will wait up to 45 minutes for ENIs to detach (configured via `timeouts` blocks).
 
-**Optional faster cleanup**: Before running `terraform destroy`, you can manually delete "available" ENIs:
+**Recommended: Run ENI cleanup during destroy**
+
+In a separate terminal while `terraform destroy` is running:
 
 ```bash
-# Run from the scripts/ directory
-./cleanup_enis.sh
+# Python version (recommended - uses boto3, works cross-platform)
+python scripts/cleanup_enis.py --watch
+
+# Or bash version (requires AWS CLI)
+./scripts/cleanup_enis.sh
 ```
 
-This helper script identifies and deletes detached ENIs associated with the stack's security group, reducing destroy time to ~2-3 minutes.
+The Python script runs in watch mode, continuously checking for and deleting ENIs as they become "available" during the destroy process. This reduces destroy time from 20+ minutes to ~2-3 minutes.
+
+**Or one-time cleanup before destroy**:
+
+```bash
+# Delete any already-available ENIs before starting destroy
+python scripts/cleanup_enis.py
+```
 
 ## Modular Database Setup
 

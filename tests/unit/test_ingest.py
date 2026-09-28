@@ -35,6 +35,54 @@ def test_chunk_text_respects_sentences():
         assert chunk_content.strip().endswith('.') or chunk_content == chunks[-1][0]
 
 
+def test_chunk_text_faq_structure():
+    """Test that FAQ Q:/A: pairs are chunked together."""
+    text = """Q: What is SOC 2?
+A: SOC 2 is a compliance framework for data security.
+
+Q: Do you support AES encryption?
+A: Yes, we use AES-256 encryption at rest."""
+
+    chunks = chunk_text(text, chunk_size=200, chunk_overlap=20)
+
+    # Should create separate chunks for each Q/A pair
+    assert len(chunks) >= 1
+
+    # Check that Q and A stay together
+    soc2_chunks = [c for c in chunks if "SOC 2" in c[0]]
+    assert len(soc2_chunks) >= 1
+
+    # The chunk should contain both Q and A
+    soc2_chunk = soc2_chunks[0][0]
+    assert "Q:" in soc2_chunk
+    assert "A:" in soc2_chunk or "compliance framework" in soc2_chunk
+
+
+def test_chunk_text_markdown_headings():
+    """Test that markdown headings create chunk boundaries."""
+    text = """# Security Features
+
+Our platform provides enterprise-grade security.
+
+## Encryption at Rest
+
+All data is encrypted with AES-256.
+
+## SOC 2 Compliance
+
+We maintain SOC 2 Type II certification."""
+
+    chunks = chunk_text(text, chunk_size=200, chunk_overlap=20)
+
+    # Should create chunks at heading boundaries
+    assert len(chunks) >= 2
+
+    # Each chunk should have its heading
+    soc2_chunks = [c for c in chunks if "SOC 2" in c[0]]
+    assert len(soc2_chunks) >= 1
+    assert any("## SOC 2 Compliance" in c[0] for c in soc2_chunks)
+
+
 def test_chunk_text_empty():
     """Test chunking empty text."""
     text = ""

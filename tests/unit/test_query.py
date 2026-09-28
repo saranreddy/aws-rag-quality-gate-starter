@@ -20,7 +20,10 @@ def test_retrieve_chunks(mock_connect, mock_register_vector):
     ]
 
     embedding = [0.1] * 1024
-    chunks = retrieve_chunks(embedding, 5, "localhost", 5432, "testdb", "user", "pass")
+    question_text = "test question"
+    chunks = retrieve_chunks(
+        embedding, question_text, 5, "localhost", 5432, "testdb", "user", "pass", use_hybrid=False
+    )
 
     assert len(chunks) == 2
     assert chunks[0]["document_id"] == "doc1.pdf"

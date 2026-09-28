@@ -44,12 +44,17 @@ def extract_text_from_text_file(file_path: str) -> List[Tuple[str, int]]:
     return [(text, 1)]
 
 
-def chunk_text(text: str, chunk_size: int = 512, chunk_overlap: int = 50) -> List[Tuple[str, int, int]]:
-    """Split text into overlapping chunks on sentence boundaries.
+def chunk_text(text: str, chunk_size: int = 400, chunk_overlap: int = 50) -> List[Tuple[str, int, int]]:
+    """Split text into chunks using structure-aware segmentation.
+
+    Prioritizes natural document structure:
+    1. Markdown headings (# ## ###)
+    2. FAQ Q:/A: pairs
+    3. Sentence boundaries with target chunk size
 
     Args:
         text: Input text
-        chunk_size: Target chunk size in characters (may exceed slightly to avoid mid-sentence cuts)
+        chunk_size: Target chunk size in characters (smaller default for focused chunks)
         chunk_overlap: Overlap between chunks in characters
 
     Returns:
@@ -58,37 +63,116 @@ def chunk_text(text: str, chunk_size: int = 512, chunk_overlap: int = 50) -> Lis
     if not text:
         return []
 
-    # Split on sentence boundaries: period, question mark, exclamation, or newlines
-    # Also split on markdown headings (lines starting with #)
-    sentence_endings = re.compile(r'(?<=[.!?])\s+|\n+|(?=^#{1,6}\s)', re.MULTILINE)
-    sentences = sentence_endings.split(text)
+    chunks = []
+
+    # Split on markdown headings and FAQ Q:/A: pairs
+    # Pattern matches markdown headings or Q:/A: pairs (keep them together)
+    heading_pattern = re.compile(r'^#{1,6}\s+.+?$', re.MULTILINE)
+    faq_pair_pattern = re.compile(r'^Q:\s*.+?\n+A:\s*.+?(?=\n\n|$)', re.MULTILINE | re.DOTALL)
+
+    # Find all structural elements
+    headings = [(m.start(), m.end(), 'heading') for m in heading_pattern.finditer(text)]
+    faq_pairs = [(m.start(), m.end(), 'faq') for m in faq_pair_pattern.finditer(text)]
+
+    # Combine and sort all boundaries
+    all_boundaries = sorted(headings + faq_pairs, key=lambda x: x[0])
+
+    if not all_boundaries:
+        # No structure found, fall back to sentence-based chunking
+        return _chunk_by_sentences(text, chunk_size, chunk_overlap, 0)
+
+    # Process each structural section
+    section_start = 0
+    for i, (boundary_start, boundary_end, boundary_type) in enumerate(all_boundaries):
+        # Check if there's text before this boundary
+        if boundary_start > section_start:
+            before_text = text[section_start:boundary_start].strip()
+            if before_text:
+                section_chunks = _chunk_by_sentences(before_text, chunk_size, chunk_overlap, section_start)
+                chunks.extend(section_chunks)
+
+        # Get the structural element
+        element_text = text[boundary_start:boundary_end].strip()
+
+        # For FAQ pairs, we already have Q+A together
+        # For headings, get content until next boundary
+        if boundary_type == 'faq':
+            section_text = element_text
+            next_section_start = boundary_end
+        else:  # heading
+            next_boundary_start = all_boundaries[i + 1][0] if i + 1 < len(all_boundaries) else len(text)
+            content_text = text[boundary_end:next_boundary_start].strip()
+            section_text = f"{element_text}\n{content_text}" if content_text else element_text
+            next_section_start = next_boundary_start
+
+        # If section is small enough, keep as single chunk
+        if len(section_text) <= chunk_size * 1.5:
+            chunks.append((section_text, boundary_start, boundary_end if boundary_type == 'faq' else next_section_start))
+        else:
+            # Section too large, split but try to keep structure together
+            section_chunks = _chunk_by_sentences(section_text, chunk_size, chunk_overlap, boundary_start)
+            chunks.extend(section_chunks)
+
+        section_start = next_section_start
+
+    # Handle any remaining text after last boundary
+    if section_start < len(text):
+        remaining = text[section_start:].strip()
+        if remaining:
+            remaining_chunks = _chunk_by_sentences(remaining, chunk_size, chunk_overlap, section_start)
+            chunks.extend(remaining_chunks)
+
+    return chunks
+
+
+def _chunk_by_sentences(
+    text: str,
+    chunk_size: int,
+    chunk_overlap: int,
+    offset: int
+) -> List[Tuple[str, int, int]]:
+    """Helper function to chunk text by sentences.
+
+    Args:
+        text: Text to chunk
+        chunk_size: Target size
+        chunk_overlap: Overlap size
+        offset: Starting offset in original document
+
+    Returns:
+        List of (chunk_text, start_offset, end_offset) tuples
+    """
+    if not text:
+        return []
+
+    # Split on sentence boundaries
+    sentence_endings = re.compile(r'(?<=[.!?])\s+|\n+')
+    sentences = [s.strip() for s in sentence_endings.split(text) if s.strip()]
+
+    if not sentences:
+        return [(text, offset, offset + len(text))]
 
     chunks = []
     current_chunk = []
     current_length = 0
-    chunk_start = 0
+    chunk_start = offset
 
     for sentence in sentences:
-        sentence = sentence.strip()
-        if not sentence:
-            continue
-
         sentence_len = len(sentence)
 
-        # If adding this sentence would exceed chunk_size and we have content, finalize chunk
+        # If adding this sentence exceeds chunk_size and we have content, finalize
         if current_length + sentence_len > chunk_size and current_chunk:
             chunk_content = ' '.join(current_chunk)
             chunk_end = chunk_start + len(chunk_content)
             chunks.append((chunk_content, chunk_start, chunk_end))
 
-            # Start new chunk with overlap
-            # Keep sentences from the end that fit within overlap size
+            # Overlap: keep sentences from end that fit in overlap
             overlap_length = 0
             overlap_sentences = []
             for sent in reversed(current_chunk):
                 if overlap_length + len(sent) <= chunk_overlap:
                     overlap_sentences.insert(0, sent)
-                    overlap_length += len(sent) + 1  # +1 for space
+                    overlap_length += len(sent) + 1
                 else:
                     break
 
@@ -97,9 +181,9 @@ def chunk_text(text: str, chunk_size: int = 512, chunk_overlap: int = 50) -> Lis
             chunk_start = chunk_end - overlap_length
 
         current_chunk.append(sentence)
-        current_length += sentence_len + 1  # +1 for space
+        current_length += sentence_len + 1
 
-    # Add final chunk if any content remains
+    # Final chunk
     if current_chunk:
         chunk_content = ' '.join(current_chunk)
         chunk_end = chunk_start + len(chunk_content)

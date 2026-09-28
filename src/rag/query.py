@@ -10,26 +10,32 @@ from pgvector.psycopg2 import register_vector
 
 def retrieve_chunks(
     question_embedding: List[float],
+    question_text: str,
     top_k: int,
     db_host: str,
     db_port: int,
     db_name: str,
     db_user: str,
     db_password: str,
+    use_hybrid: bool = True,
 ) -> List[Dict[str, Any]]:
-    """Retrieve most relevant chunks using vector similarity.
+    """Retrieve most relevant chunks using hybrid retrieval.
+
+    Combines vector similarity with full-text search via reciprocal rank fusion.
 
     Args:
         question_embedding: Question embedding vector
+        question_text: Question text for full-text search
         top_k: Number of chunks to retrieve
         db_host: Database host
         db_port: Database port
         db_name: Database name
         db_user: Database username
         db_password: Database password
+        use_hybrid: Whether to use hybrid retrieval (default True)
 
     Returns:
-        List of chunk dictionaries with metadata
+        List of chunk dictionaries with metadata, sorted by combined score
     """
     conn = psycopg2.connect(
         host=db_host,
@@ -42,30 +48,106 @@ def retrieve_chunks(
 
     try:
         with conn.cursor() as cur:
+            if not use_hybrid:
+                # Vector-only retrieval
+                cur.execute(
+                    """
+                    SELECT
+                        document_id, page_number, chunk_index,
+                        chunk_text, start_offset, end_offset,
+                        metadata, embedding <=> %s::vector AS distance
+                    FROM document_chunks
+                    ORDER BY embedding <=> %s::vector
+                    LIMIT %s
+                    """,
+                    (question_embedding, question_embedding, top_k),
+                )
+
+                results = []
+                for row in cur.fetchall():
+                    results.append({
+                        "document_id": row[0],
+                        "page_number": row[1],
+                        "chunk_index": row[2],
+                        "chunk_text": row[3],
+                        "start_offset": row[4],
+                        "end_offset": row[5],
+                        "metadata": row[6],
+                        "distance": float(row[7]),
+                    })
+                return results
+
+            # Hybrid retrieval: get top 2*top_k from each method
+            fetch_limit = top_k * 2
+
+            # Vector similarity results
             cur.execute(
                 """
                 SELECT
-                    document_id, page_number, chunk_index,
-                    chunk_text, start_offset, end_offset,
-                    metadata, embedding <=> %s::vector AS distance
+                    id, document_id, page_number, chunk_index,
+                    chunk_text, start_offset, end_offset, metadata
                 FROM document_chunks
                 ORDER BY embedding <=> %s::vector
                 LIMIT %s
                 """,
-                (question_embedding, question_embedding, top_k),
+                (question_embedding, fetch_limit),
             )
+            vector_results = {row[0]: (idx, row) for idx, row in enumerate(cur.fetchall())}
+
+            # Full-text search results
+            cur.execute(
+                """
+                SELECT
+                    id, document_id, page_number, chunk_index,
+                    chunk_text, start_offset, end_offset, metadata,
+                    ts_rank(text_search, plainto_tsquery('english', %s)) AS rank
+                FROM document_chunks
+                WHERE text_search @@ plainto_tsquery('english', %s)
+                ORDER BY rank DESC
+                LIMIT %s
+                """,
+                (question_text, question_text, fetch_limit),
+            )
+            text_results = {row[0]: (idx, row) for idx, row in enumerate(cur.fetchall())}
+
+            # Reciprocal Rank Fusion (RRF)
+            # Score = 1 / (k + rank), where k=60 is a constant
+            k = 60
+            chunk_scores = {}
+
+            for chunk_id, (rank, row) in vector_results.items():
+                chunk_scores[chunk_id] = chunk_scores.get(chunk_id, 0) + 1 / (k + rank + 1)
+
+            for chunk_id, (rank, row) in text_results.items():
+                chunk_scores[chunk_id] = chunk_scores.get(chunk_id, 0) + 1 / (k + rank + 1)
+
+            # Get all unique chunks
+            all_chunks = {}
+            for chunk_id, (rank, row) in vector_results.items():
+                all_chunks[chunk_id] = row
+            for chunk_id, (rank, row) in text_results.items():
+                if chunk_id not in all_chunks:
+                    all_chunks[chunk_id] = row[:8]  # Exclude rank column
+
+            # Sort by RRF score and take top_k
+            sorted_chunks = sorted(
+                chunk_scores.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )[:top_k]
 
             results = []
-            for row in cur.fetchall():
+            for chunk_id, score in sorted_chunks:
+                row = all_chunks[chunk_id]
                 results.append({
-                    "document_id": row[0],
-                    "page_number": row[1],
-                    "chunk_index": row[2],
-                    "chunk_text": row[3],
-                    "start_offset": row[4],
-                    "end_offset": row[5],
-                    "metadata": row[6],
-                    "distance": float(row[7]),
+                    "document_id": row[1],
+                    "page_number": row[2],
+                    "chunk_index": row[3],
+                    "chunk_text": row[4],
+                    "start_offset": row[5],
+                    "end_offset": row[6],
+                    "metadata": row[7],
+                    "rrf_score": score,
                 })
 
             return results
@@ -186,12 +268,14 @@ def query_rag(
 
     chunks = retrieve_chunks(
         question_embedding,
-        config.get("top_k", 5),
+        question,
+        config.get("top_k", 10),
         config["db_host"],
         config.get("db_port", 5432),
         config.get("db_name", "ragdb"),
         db_credentials["username"],
         db_credentials["password"],
+        config.get("use_hybrid_retrieval", True),
     )
 
     if not chunks:

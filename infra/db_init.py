@@ -46,7 +46,8 @@ def handler(event, context):
                     end_offset INTEGER NOT NULL,
                     embedding vector(1024),
                     metadata JSONB,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    text_search tsvector
                 );
             """)
 
@@ -62,6 +63,32 @@ def handler(event, context):
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS document_chunks_document_id_idx
                 ON document_chunks (document_id);
+            """)
+
+            # Create GIN index for full-text search
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS document_chunks_text_search_idx
+                ON document_chunks USING GIN (text_search);
+            """)
+
+            # Create trigger to auto-update text_search column
+            cur.execute("""
+                CREATE OR REPLACE FUNCTION document_chunks_text_search_trigger() RETURNS trigger AS $$
+                BEGIN
+                    NEW.text_search := to_tsvector('english', COALESCE(NEW.chunk_text, ''));
+                    RETURN NEW;
+                END
+                $$ LANGUAGE plpgsql;
+            """)
+
+            cur.execute("""
+                DROP TRIGGER IF EXISTS document_chunks_text_search_update ON document_chunks;
+            """)
+
+            cur.execute("""
+                CREATE TRIGGER document_chunks_text_search_update
+                BEFORE INSERT OR UPDATE ON document_chunks
+                FOR EACH ROW EXECUTE FUNCTION document_chunks_text_search_trigger();
             """)
 
         conn.commit()

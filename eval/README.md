@@ -9,14 +9,15 @@ This directory contains the evaluation dataset and sample documents for the qual
 
 ## Sample Documents
 
-The corpus includes 4 documents for a fictional cloud storage company (CloudSync):
+The corpus includes 5 documents for a fictional cloud storage company (CloudSync):
 
 1. **product-features.md**: Product features, pricing plans, supported file types (Markdown)
 2. **privacy-policy.txt**: Privacy policy, data collection, user rights (Plain text)
 3. **api-documentation.md**: API endpoints, authentication, rate limits (Markdown)
 4. **support-faq.txt**: Frequently asked questions, account/billing, technical support (Plain text)
+5. **terms-of-service.pdf**: Legal terms, data retention, account closure policies (PDF)
 
-These documents cover typical SaaS help center content: features, pricing, security, APIs, and support.
+These documents cover typical SaaS help center content: features, pricing, security, APIs, support, and legal terms.
 
 ## Dataset Format
 
