@@ -81,13 +81,14 @@ resource "aws_lambda_function" "query" {
 
   environment {
     variables = {
-      DB_HOST            = aws_rds_cluster.aurora.endpoint
-      DB_PORT            = "5432"
-      DB_NAME            = var.db_name
-      DB_SECRET_NAME     = aws_secretsmanager_secret.db_credentials.name
-      EMBEDDING_MODEL_ID = var.embedding_model_id
-      LLM_MODEL_ID       = var.llm_model_id
-      TOP_K              = tostring(var.top_k)
+      DB_HOST               = aws_rds_cluster.aurora.endpoint
+      DB_PORT               = "5432"
+      DB_NAME               = var.db_name
+      DB_SECRET_NAME        = aws_secretsmanager_secret.db_credentials.name
+      EMBEDDING_MODEL_ID    = var.embedding_model_id
+      LLM_MODEL_ID          = var.llm_model_id
+      TOP_K                 = tostring(var.top_k)
+      USE_HYBRID_RETRIEVAL  = tostring(var.use_hybrid_retrieval)
     }
   }
 

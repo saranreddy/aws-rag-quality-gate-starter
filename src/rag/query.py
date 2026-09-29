@@ -94,15 +94,15 @@ def retrieve_chunks(
             )
             vector_results = {row[0]: (idx, row) for idx, row in enumerate(cur.fetchall())}
 
-            # Full-text search results
+            # Full-text search results using websearch_to_tsquery for more flexible matching
             cur.execute(
                 """
                 SELECT
                     id, document_id, page_number, chunk_index,
                     chunk_text, start_offset, end_offset, metadata,
-                    ts_rank(text_search, plainto_tsquery('english', %s)) AS rank
+                    ts_rank(text_search, websearch_to_tsquery('english', %s)) AS rank
                 FROM document_chunks
-                WHERE text_search @@ plainto_tsquery('english', %s)
+                WHERE text_search @@ websearch_to_tsquery('english', %s)
                 ORDER BY rank DESC
                 LIMIT %s
                 """,

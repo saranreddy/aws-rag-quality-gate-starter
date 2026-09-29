@@ -68,3 +68,42 @@ def test_query_api_url_construction(mock_request):
     assert call_args[0][0] == "https://api.example.com/query"
     assert call_args[1]["method"] == "POST"
     assert call_args[1]["headers"]["Content-Type"] == "application/json"
+
+
+@patch('scripts.run_eval.request')
+@patch('scripts.run_eval.time.sleep')
+def test_query_api_retry_on_error(mock_sleep, mock_request):
+    """Test that query API retries on URLError."""
+    from urllib.error import URLError
+
+    from scripts.run_eval import query_api
+
+    mock_request.urlopen.side_effect = [
+        URLError("Connection refused"),
+        URLError("Connection refused"),
+        MagicMock(__enter__=MagicMock(return_value=MagicMock(
+            read=MagicMock(return_value=json.dumps({"answer": "Success after retries"}).encode("utf-8"))
+        ))),
+    ]
+
+    result = query_api("https://api.example.com", "Test?", max_retries=3)
+
+    assert result is not None
+    assert result["answer"] == "Success after retries"
+    assert mock_sleep.call_count == 2
+
+
+@patch('scripts.run_eval.request')
+@patch('scripts.run_eval.time.sleep')
+def test_query_api_returns_none_after_max_retries(mock_sleep, mock_request):
+    """Test that query API returns None after max retries exhausted."""
+    from urllib.error import URLError
+
+    from scripts.run_eval import query_api
+
+    mock_request.urlopen.side_effect = URLError("Connection refused")
+
+    result = query_api("https://api.example.com", "Test?", max_retries=3)
+
+    assert result is None
+    assert mock_sleep.call_count == 2

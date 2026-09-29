@@ -31,7 +31,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         "db_secret_name": os.environ["DB_SECRET_NAME"],
         "embedding_model_id": os.environ.get("EMBEDDING_MODEL_ID", "amazon.titan-embed-text-v2:0"),
         "llm_model_id": os.environ.get("LLM_MODEL_ID", "us.anthropic.claude-sonnet-4-6"),
-        "top_k": int(os.environ.get("TOP_K", "5")),
+        "top_k": int(os.environ.get("TOP_K", "10")),
+        "use_hybrid_retrieval": os.environ.get("USE_HYBRID_RETRIEVAL", "true").lower() in ("true", "1", "yes"),
     }
 
     try:

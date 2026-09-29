@@ -5,6 +5,9 @@ This script runs in a loop checking for "available" (detached) ENIs and deleting
 as they become available during the destroy process. Lambda ENIs stay "in-use" until
 ~19 minutes into destroy, then transition to "available".
 
+The script exits automatically when the security group is deleted (normal completion)
+or after a timeout (default 45 minutes).
+
 Usage:
     # In one terminal:
     terraform destroy
@@ -108,12 +111,18 @@ def cleanup_once(project_name, region):
     return deleted
 
 
-def cleanup_watch(project_name, region, interval=30):
-    """Watch for ENIs and delete them as they become available."""
+def cleanup_watch(project_name, region, interval=30, timeout_minutes=45):
+    """Watch for ENIs and delete them as they become available.
+
+    Exits when:
+    - The security group is deleted (normal completion during terraform destroy)
+    - The timeout is reached (default 45 minutes to match Terraform's timeout)
+    - Ctrl+C is pressed
+    """
     ec2 = boto3.client("ec2", region_name=region)
 
     print(f"Watching for Lambda ENIs for project '{project_name}' in region '{region}'")
-    print(f"Checking every {interval} seconds. Press Ctrl+C to stop.\n")
+    print(f"Checking every {interval} seconds. Timeout: {timeout_minutes} minutes. Press Ctrl+C to stop.\n")
 
     sg_id = find_lambda_security_group(ec2, project_name)
     if not sg_id:
@@ -124,10 +133,26 @@ def cleanup_watch(project_name, region, interval=30):
 
     total_deleted = 0
     iteration = 0
+    start_time = time.time()
 
     try:
         while True:
             iteration += 1
+            elapsed_minutes = (time.time() - start_time) / 60
+
+            if elapsed_minutes > timeout_minutes:
+                print(f"\n[{time.strftime('%H:%M:%S')}] Timeout reached ({timeout_minutes} minutes)")
+                print(f"Security group {sg_id} still exists but timeout exceeded.")
+                print(f"Deleted {total_deleted} ENI(s) total.")
+                return total_deleted
+
+            # Check if security group still exists
+            current_sg_id = find_lambda_security_group(ec2, project_name)
+            if not current_sg_id:
+                print(f"\n[{time.strftime('%H:%M:%S')}] Security group deleted - destroy complete!")
+                print(f"Deleted {total_deleted} ENI(s) total.")
+                return total_deleted
+
             enis = find_available_enis(ec2, sg_id)
 
             if enis:
@@ -138,8 +163,8 @@ def cleanup_watch(project_name, region, interval=30):
                     if delete_eni(ec2, eni_id):
                         total_deleted += 1
             else:
-                if iteration % 4 == 0:  # Print status every 2 minutes
-                    print(f"[{time.strftime('%H:%M:%S')}] No available ENIs (checked {iteration} times)")
+                if iteration % 4 == 0:
+                    print(f"[{time.strftime('%H:%M:%S')}] No available ENIs (checked {iteration} times, {elapsed_minutes:.1f} min elapsed)")
 
             time.sleep(interval)
 
@@ -173,11 +198,17 @@ def main():
         default=30,
         help="Check interval in seconds for watch mode (default: 30)"
     )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=45,
+        help="Timeout in minutes for watch mode (default: 45)"
+    )
 
     args = parser.parse_args()
 
     if args.watch:
-        cleanup_watch(args.project_name, args.region, args.interval)
+        cleanup_watch(args.project_name, args.region, args.interval, args.timeout)
     else:
         cleanup_once(args.project_name, args.region)
 

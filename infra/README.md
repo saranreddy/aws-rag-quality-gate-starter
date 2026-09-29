@@ -222,7 +222,7 @@ python scripts/cleanup_enis.py --watch
 ./scripts/cleanup_enis.sh
 ```
 
-The Python script runs in watch mode, continuously checking for and deleting ENIs as they become "available" during the destroy process. This reduces destroy time from 20+ minutes to ~2-3 minutes.
+The Python script runs in watch mode, continuously checking for and deleting ENIs as they become "available" during the destroy process. ENIs stay "in-use" for approximately 19 minutes, then transition to "available" and are automatically deleted by the script. The script exits automatically when the security group is deleted (indicating destroy completion) or after a 45-minute timeout.
 
 **Or one-time cleanup before destroy**:
 

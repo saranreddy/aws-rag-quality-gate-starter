@@ -76,6 +76,12 @@ variable "top_k" {
   default     = 10
 }
 
+variable "use_hybrid_retrieval" {
+  description = "Enable hybrid retrieval (vector + full-text search)"
+  type        = bool
+  default     = true
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for VPC"
   type        = string

@@ -33,16 +33,17 @@ def load_eval_dataset(dataset_path: str) -> List[Dict[str, Any]]:
     return questions
 
 
-def query_api(api_url: str, question: str, timeout: int = 60) -> Dict[str, Any]:
-    """Call the deployed query API endpoint.
+def query_api(api_url: str, question: str, timeout: int = 60, max_retries: int = 3) -> Dict[str, Any]:
+    """Call the deployed query API endpoint with retry logic.
 
     Args:
         api_url: API Gateway URL
         question: Question to query
         timeout: Request timeout in seconds
+        max_retries: Maximum number of retry attempts
 
     Returns:
-        Query response dictionary
+        Query response dictionary, or None if all retries failed
     """
     req_data = json.dumps({"question": question}).encode("utf-8")
     req = request.Request(
@@ -52,17 +53,25 @@ def query_api(api_url: str, question: str, timeout: int = 60) -> Dict[str, Any]:
         method="POST"
     )
 
-    start_time = time.time()
-    try:
-        with request.urlopen(req, timeout=timeout) as response:
+    for attempt in range(max_retries):
+        start_time = time.time()
+        try:
+            with request.urlopen(req, timeout=timeout) as response:
+                elapsed = time.time() - start_time
+                result = json.loads(response.read().decode("utf-8"))
+                if elapsed > timeout * 0.9:
+                    print(f"  Warning: Query took {elapsed:.1f}s (near timeout)")
+                return result
+        except URLError as e:
             elapsed = time.time() - start_time
-            result = json.loads(response.read().decode("utf-8"))
-            if elapsed > timeout * 0.9:
-                print(f"  Warning: Query took {elapsed:.1f}s (near timeout)")
-            return result
-    except URLError as e:
-        print(f"  Error calling API: {e}")
-        raise
+            if attempt < max_retries - 1:
+                backoff = 2 ** attempt
+                print(f"  Error calling API (attempt {attempt + 1}/{max_retries}): {e}")
+                print(f"  Retrying in {backoff}s...")
+                time.sleep(backoff)
+            else:
+                print(f"  Error calling API (final attempt {attempt + 1}/{max_retries}): {e}")
+                return None
 
 
 def run_evaluation(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -84,10 +93,21 @@ def run_evaluation(config: Dict[str, Any]) -> Dict[str, Any]:
 
     results = []
 
+    failed_questions = []
+
     for i, question_data in enumerate(questions):
         print(f"\nEvaluating question {i+1}/{len(questions)}: {question_data['question'][:60]}...")
 
         answer_data = query_api(api_url, question_data["question"])
+
+        if answer_data is None:
+            print("  Failed to get response after retries. Recording as failed question.")
+            failed_questions.append({
+                "question_id": i + 1,
+                "question": question_data["question"],
+                "error": "API call failed after all retries"
+            })
+            continue
 
         eval_result = evaluate_single_question(question_data, answer_data, config)
         results.append(eval_result)
@@ -96,19 +116,30 @@ def run_evaluation(config: Dict[str, Any]) -> Dict[str, Any]:
         print(f"  Faithfulness: {eval_result['scores']['faithfulness']:.2f}")
         print(f"  Citation Accuracy: {eval_result['scores']['citation_accuracy']:.2f}")
 
-    avg_scores = {
-        "correctness": sum(r["scores"]["correctness"] for r in results) / len(results),
-        "faithfulness": sum(r["scores"]["faithfulness"] for r in results) / len(results),
-        "citation_accuracy": sum(r["scores"]["citation_accuracy"] for r in results) / len(results),
-    }
+    if results:
+        avg_scores = {
+            "correctness": sum(r["scores"]["correctness"] for r in results) / len(results),
+            "faithfulness": sum(r["scores"]["faithfulness"] for r in results) / len(results),
+            "citation_accuracy": sum(r["scores"]["citation_accuracy"] for r in results) / len(results),
+        }
 
-    # Calculate total token usage from all questions
-    total_input_tokens = sum(r["token_usage"].get("input_tokens", 0) for r in results)
-    total_output_tokens = sum(r["token_usage"].get("output_tokens", 0) for r in results)
+        # Calculate total token usage from all questions
+        total_input_tokens = sum(r["token_usage"].get("input_tokens", 0) for r in results)
+        total_output_tokens = sum(r["token_usage"].get("output_tokens", 0) for r in results)
+    else:
+        avg_scores = {
+            "correctness": 0.0,
+            "faithfulness": 0.0,
+            "citation_accuracy": 0.0,
+        }
+        total_input_tokens = 0
+        total_output_tokens = 0
 
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "total_questions": len(results),
+        "total_questions": len(questions),
+        "successful_questions": len(results),
+        "failed_questions": failed_questions,
         "average_scores": avg_scores,
         "total_token_usage": {
             "input_tokens": total_input_tokens,
@@ -136,6 +167,13 @@ def check_thresholds(results: Dict[str, Any], thresholds: Dict[str, float]) -> b
 
     print("\n" + "=" * 60)
     print("EVALUATION QUALITY GATE")
+    print("=" * 60)
+
+    if results.get("failed_questions"):
+        print(f"WARNING: {len(results['failed_questions'])} of {results['total_questions']} questions failed")
+        print(f"Evaluated: {results['successful_questions']}/{results['total_questions']} questions")
+    else:
+        print(f"Evaluated: {results['successful_questions']}/{results['total_questions']} questions")
     print("=" * 60)
 
     for metric, score in avg_scores.items():
@@ -190,12 +228,24 @@ def save_report(results: Dict[str, Any], output_dir: str = "eval/reports") -> No
         f.write("# RAG Evaluation Report\n\n")
         f.write(f"**Timestamp:** {results['timestamp']}\n\n")
         f.write(f"**Total Questions:** {results['total_questions']}\n\n")
+        f.write(f"**Successful Questions:** {results['successful_questions']}\n\n")
+
+        if results.get("failed_questions"):
+            f.write(f"**Failed Questions:** {len(results['failed_questions'])}\n\n")
 
         f.write("## Average Scores\n\n")
         f.write("| Metric | Score |\n")
         f.write("|--------|-------|\n")
         for metric, score in results["average_scores"].items():
             f.write(f"| {metric} | {score:.3f} |\n")
+
+        if results.get("failed_questions"):
+            f.write("\n## Failed Questions\n\n")
+            for failed in results["failed_questions"]:
+                f.write(f"### Question {failed['question_id']}\n\n")
+                f.write(f"**Q:** {failed['question']}\n\n")
+                f.write(f"**Error:** {failed['error']}\n\n")
+                f.write("---\n\n")
 
         f.write("\n## Detailed Results\n\n")
         for i, result in enumerate(results["detailed_results"]):

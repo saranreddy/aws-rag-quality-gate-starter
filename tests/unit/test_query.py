@@ -108,3 +108,71 @@ def test_query_rag_no_chunks(mock_connect, mock_register_vector, mock_embed_text
     assert result["answer"] == "I don't know based on the provided documents."
     assert result["citations"] == []
     assert result["retrieved_chunks"] == 0
+
+
+@patch('src.rag.query.register_vector')
+@patch('src.rag.query.psycopg2.connect')
+def test_retrieve_chunks_hybrid_mode(mock_connect, mock_register_vector):
+    """Test retrieving chunks with hybrid retrieval enabled."""
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+    mock_connect.return_value = mock_conn
+
+    mock_cursor.fetchall.side_effect = [
+        [
+            (1, "doc1.pdf", 1, 0, "pricing plans chunk", 0, 100, {"source": "doc1.pdf"}),
+            (2, "doc2.pdf", 2, 1, "another chunk", 100, 200, {"source": "doc2.pdf"}),
+        ],
+        [
+            (1, "doc1.pdf", 1, 0, "pricing plans chunk", 0, 100, {"source": "doc1.pdf"}, 0.9),
+            (3, "doc3.pdf", 3, 2, "payment methods chunk", 200, 300, {"source": "doc3.pdf"}, 0.8),
+        ],
+    ]
+
+    embedding = [0.1] * 1024
+    question_text = "three pricing plans payment methods"
+    chunks = retrieve_chunks(
+        embedding, question_text, 2, "localhost", 5432, "testdb", "user", "pass", use_hybrid=True
+    )
+
+    assert len(chunks) <= 2
+    assert mock_cursor.execute.call_count == 2
+
+    vector_call = mock_cursor.execute.call_args_list[0]
+    text_call = mock_cursor.execute.call_args_list[1]
+
+    assert "ORDER BY embedding" in vector_call[0][0]
+    assert "websearch_to_tsquery" in text_call[0][0]
+
+    mock_conn.close.assert_called_once()
+
+
+@patch('src.rag.query.register_vector')
+@patch('src.rag.query.psycopg2.connect')
+def test_retrieve_chunks_vector_only_mode(mock_connect, mock_register_vector):
+    """Test retrieving chunks with hybrid retrieval disabled (vector only)."""
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+    mock_connect.return_value = mock_conn
+
+    mock_cursor.fetchall.return_value = [
+        ("doc1.pdf", 1, 0, "chunk text 1", 0, 100, {"source": "doc1.pdf"}, 0.1),
+    ]
+
+    embedding = [0.1] * 1024
+    question_text = "test question"
+    chunks = retrieve_chunks(
+        embedding, question_text, 5, "localhost", 5432, "testdb", "user", "pass", use_hybrid=False
+    )
+
+    assert len(chunks) == 1
+    assert chunks[0]["document_id"] == "doc1.pdf"
+
+    assert mock_cursor.execute.call_count == 1
+
+    vector_call = mock_cursor.execute.call_args_list[0]
+    assert "websearch_to_tsquery" not in vector_call[0][0]
+
+    mock_conn.close.assert_called_once()
