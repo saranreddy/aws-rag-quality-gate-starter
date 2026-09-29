@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, cursor/* ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Lint with ruff
+      run: |
+        ruff check src/ scripts/ tests/
+
+    - name: Run unit tests
+      run: |
+        pytest tests/unit/ -v --tb=short
+
+  terraform-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+
+    - name: Terraform Format Check
+      working-directory: ./infra
+      run: terraform fmt -check -recursive
+
+    - name: Terraform Init
+      working-directory: ./infra
+      run: terraform init -backend=false
+
+    - name: Terraform Validate
+      working-directory: ./infra
+      run: terraform validate
+
+  eval-gate:
+    runs-on: ubuntu-latest
+    needs: [lint-and-test]
+    # Only run if AWS credentials are configured
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Check AWS credentials
+      id: check-aws
+      run: |
+        if [ -n "${{ secrets.AWS_REGION }}" ]; then
+          echo "aws_configured=true" >> $GITHUB_OUTPUT
+        else
+          echo "aws_configured=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Configure AWS credentials
+      if: steps.check-aws.outputs.aws_configured == 'true'
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Run evaluation quality gate
+      if: steps.check-aws.outputs.aws_configured == 'true'
+      run: |
+        python scripts/run_eval.py
+      continue-on-error: false
+
+    - name: Skip evaluation (no AWS credentials)
+      if: steps.check-aws.outputs.aws_configured == 'false'
+      run: |
+        echo "⏭️ Skipping evaluation quality gate (no AWS credentials configured)"
+        echo "To enable: configure AWS_REGION and AWS_ROLE_ARN secrets for OIDC"
